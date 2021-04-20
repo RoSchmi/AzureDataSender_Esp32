@@ -50,10 +50,14 @@ typedef enum
 class TableClient
 {
 public:
+     // RoSchm
+    // Buffers defined volatile to be placed in .dram0.bss memory segment
+    //volatile uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
+    volatile uint8_t responseBuffer[1000] {0};
 
-    //static uint8_t theDummyArray[10000];
     
-    TableClient(CloudStorageAccount *account, const char * caCert, HTTPClient *httpClient, WiFiClient * wifiClient);
+    
+    TableClient(CloudStorageAccount *account, const char * caCert, HTTPClient *httpClient, WiFiClient * wifiClient, uint8_t * bufferStore);
    
     ~TableClient();
     

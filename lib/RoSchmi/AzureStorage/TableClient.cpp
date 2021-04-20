@@ -8,7 +8,12 @@ HTTPClient * _httpPtr;
 
 const char * _caCert;
 
-static uint8_t theDummyArray[10000] {0};
+
+uint8_t * _requestPtr;
+uint8_t * _responsePtr;
+
+
+
 
 //static SysTime sysTime;
       
@@ -117,12 +122,16 @@ void TableClient::CreateTableAuthorizationHeader(const char * content, const cha
 
 
 // Constructor
-TableClient::TableClient(CloudStorageAccount * account, const char * caCert, HTTPClient * httpClient, WiFiClient * wifiClient)
+TableClient::TableClient(CloudStorageAccount * account, const char * caCert, HTTPClient * httpClient, WiFiClient * wifiClient, uint8_t * bufferStorePtr)
 {
     _accountPtr = account;
     _caCert = caCert;
     _httpPtr = httpClient;
-    _wifiClient = wifiClient; 
+    _wifiClient = wifiClient;
+
+    _requestPtr = bufferStorePtr;
+    _responsePtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH;
+
 }
 TableClient::~TableClient()
 {};
@@ -177,12 +186,18 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
            
   // Create the body of the request
    // To save memory for heap, allocate buffer which can hold 900 bytes at adr 0x20029200
-   uint8_t addBuffer[REQUEST_BODY_BUFFER_LENGTH];
-   uint8_t * addBufAddress = (uint8_t *)addBuffer;
+   
+   //uint8_t addBuffer[REQUEST_BODY_BUFFER_LENGTH];
+   //uint8_t * addBufAddress = (uint8_t *)addBuffer;
+
    //addBufAddress = (uint8_t *)REQUEST_BODY_BUFFER_MEMORY_ADDR;
    // addBufAddress = (uint8_t *)addBuffer;
 
-   az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
+   //az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
+
+   az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
+   
+
 
    uint8_t remainderBuffer[1];
    uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
@@ -204,7 +219,8 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
             
    az_span_copy_u8(remainder, 0);
 
-  az_span content_to_upload = az_span_create_from_str((char *)addBufAddress); 
+  //az_span content_to_upload = az_span_create_from_str((char *)addBufAddress);
+  az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
   
 
   Serial.println("Gathered Content_to_upload");
@@ -223,7 +239,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
   char authorizationHeaderBuffer[100] {0};
 
-  CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
+  //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
+  //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
   contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
       
   Serial.println("Created authorization header");
@@ -244,7 +263,12 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   az_span response_az_span = az_span_create(responseBufferAddr, RESPONSE_BUFFER_LENGTH);
   */
 
-  uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
+  //uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
+
+  volatile uint8_t * responseBufferPtr = &responseBuffer[0];
+
+  Serial.printf("Response Buffer starts at: %09x \r\n", (uint32_t)responseBufferPtr);
+
   az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
 
   
@@ -373,11 +397,12 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
    addBufAddress = (uint8_t *)REQUEST_BODY_BUFFER_MEMORY_ADDR;
    */
    
-  uint8_t addBuffer[REQUEST_BODY_BUFFER_LENGTH] {0};
-  uint8_t * addBufAddress = (uint8_t *)addBuffer;
+  //uint8_t addBuffer[REQUEST_BODY_BUFFER_LENGTH] {0};
+  //uint8_t * addBufAddress = (uint8_t *)addBuffer;
 
 
-   az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
+   //az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
+   az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
 
    uint8_t remainderBuffer[1];
    uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
@@ -408,7 +433,9 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   
   az_span_copy_u8(remainder, 0);
   
-  az_span content_to_upload = az_span_create_from_str((char *)addBufAddress);   
+  //az_span content_to_upload = az_span_create_from_str((char *)addBufAddress);
+  az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
+
              
    String urlPath = validTableName;
    String TableEndPoint = _accountPtr->UriEndPointTable;
@@ -423,7 +450,8 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   char md5Buffer[32 +1] {0};
   char authorizationHeaderBuffer[65] {0};
 
-  CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
 
   // Create client to handle request    
   az_storage_tables_client tabClient;        

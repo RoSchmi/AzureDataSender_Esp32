@@ -53,6 +53,9 @@
 
 #include "Esp.h"
 
+uint8_t bufferStore[2000] {0};
+uint8_t * bufferStorePtr = nullptr;
+
 const char analogTableName[45] = ANALOG_TABLENAME;
 
 const char OnOffTableName_1[45] = ON_OFF_TABLENAME_01;
@@ -172,10 +175,22 @@ void setup() {
 
   uint32_t minFreeHeap = esp_get_minimum_free_heap_size();
   uint32_t freeHeapSize = esp_get_free_heap_size();
-  Serial.printf("Free Heap: %d", freeHeapSize);
+  Serial.print(F("Free Heap: "));
+  Serial.println(freeHeapSize);
 
   
+  bufferStore[0] = 0x32;
+  bufferStore[1] = 0x33;
+  bufferStore[2] = 0x33;
+  bufferStorePtr = &bufferStore[0];
 
+  Serial.printf("BufferStore-Base: %09x\r\n", (uint32_t)bufferStorePtr);
+
+  volatile uint8_t * bufferStorePtrCopy = bufferStorePtr;
+
+
+
+  
   // Wait some time (3000 ms)
   uint32_t start = millis();
   while ((millis() - start) < 3000)
@@ -946,7 +961,7 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
       //SAMCrashMonitor::iAmAlive();
   #endif
 
-  TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client);
+  TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
 
   // Create Table
   az_http_status_code statusCode = table.CreateTable(pTableName, dateTimeUTCNow, contApplicationIatomIxml, acceptApplicationIjson, returnContent, false);
@@ -1004,7 +1019,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   #endif
   */
 
-  TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client);
+  TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
   
   #if WORK_WITH_WATCHDOG == 1
       //SAMCrashMonitor::iAmAlive();

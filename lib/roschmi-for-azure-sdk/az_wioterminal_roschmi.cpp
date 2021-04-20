@@ -168,20 +168,18 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
       Serial.printf((char *) buf);
       az_span_to_str(buf, 49, head_value);
       Serial.println((char *)buf);
+      /*
       while (true)
    {
      Serial.println("Halted in Loop");
      delay(5000);
    }
-    
+    */
   
     _az_RETURN_IF_FAILED(az_http_request_get_header(request, offset, &head_name, &head_value));
        Serial.println("Get first header");
-  while (true)
-   {
-     Serial.println("Halted in Loop");
-     delay(5000);
-   }
+
+  
       
     az_span_to_str((char *)name_buffer, MAX_HEADERNAME_LENGTH -1, head_name);
     az_span_to_str((char *)value_buffer, MAX_HEADERVALUE_LENGTH -1, head_value);
@@ -190,22 +188,15 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
 
     devHttp->addHeader(nameString, valueString, true, true);
     Serial.println("After adding first header ");
-  while (true)
-   {
-     Serial.println("Halted in Loop");
-     delay(5000);
-   }
+
+  
 
 
   }
 
 
   Serial.println("After adding headers ");
-  while (true)
-   {
-     Serial.println("Halted in Loop");
-     delay(5000);
-   }
+  
 
   // int32_t bodySize = request->_internal.body._internal.size;
 
@@ -218,11 +209,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   if (az_span_is_content_equal(requMethod, AZ_SPAN_LITERAL_FROM_STR("POST")))
   {  
     Serial.println("In POST routine");
-    while (true)
-   {
-     Serial.println("Halted in Loop");
-     delay(5000);
-   }     
+      
     const char * headerKeys[] = {"ETag", "Date", "x-ms-request-id", "x-ms-version", "Content-Type"};       
     devHttp->collectHeaders(headerKeys, 5);
       
@@ -230,8 +217,14 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
 
     httpCode = devHttp->POST((char *)theBody);
  
-    delay(1); 
-        
+    delay(1);
+    /*
+     while (true)
+   {
+     Serial.println("Halted in Loop after post");
+     delay(5000);
+   }   
+   */    
     //volatile size_t responseBodySize = devHttp->getSize();
               
     int indexCtr = 0;

@@ -105,7 +105,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   }
 
  
-  String host = (char *)workBuffer;
+  String host = (const char *)workBuffer;
 
   if (slashIndex != -1)
   {

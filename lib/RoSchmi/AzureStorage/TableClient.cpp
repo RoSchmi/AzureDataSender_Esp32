@@ -10,13 +10,11 @@ const char * _caCert;
 
 
 uint8_t * _requestPtr;
+uint8_t * _propertiesPtr;
 uint8_t * _responsePtr;
 
-//volatile static char x_ms_timestamp[35] {0};
-//volatile static char timestamp[22] {0};
-
-
-
+char x_ms_timestamp[35] {0};
+char timestamp[22] {0};
 
 //static SysTime sysTime;
       
@@ -35,7 +33,7 @@ int32_t dow(int32_t year, int32_t month, int32_t day);
 void GetTableXml(EntityProperty EntityProperties[], size_t propertyCount, az_span outSpan, size_t *outSpanLength);
 DateTime GetDateTimeFromDateHeader(az_span x_ms_time);
 
-void TableClient::CreateTableAuthorizationHeader(const char * content, const char * canonicalResource, const char * ptimeStamp, const char * pHttpVerb, az_span pContentType, char * pMD5HashHex, char * pAutorizationHeader, bool useSharedKeyLite)
+void TableClient::CreateTableAuthorizationHeader(const char * content, const char * canonicalResource, const char * const ptimeStamp, const char * pHttpVerb, az_span pContentType, char * pMD5HashHex, char * pAutorizationHeader, bool useSharedKeyLite)
 {  
     char contentTypeString[25] {0};
 
@@ -138,7 +136,8 @@ TableClient::TableClient(CloudStorageAccount * account, const char * caCert, HTT
     _wifiClient = wifiClient;
 
     _requestPtr = bufferStorePtr;
-    _responsePtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH;
+    _propertiesPtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH;
+    _responsePtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH + PROPERTIES_BUFFER_LENGTH;
 
 }
 TableClient::~TableClient()
@@ -161,12 +160,13 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
    
    //volatile DateTime theCopy = pDateTimeUtcNow;
            
-  char x_ms_timestamp[35] {0};
-  char timestamp[22] {0};
+  //char x_ms_timestamp[35] {0};
+  //char timestamp[22] {0};
 
   //GetDateHeader(sysTime.getTime(), timestamp, x_ms_timestamp);
   GetDateHeader(pDateTimeUtcNow, timestamp, x_ms_timestamp);
-
+  
+  // Need copy of x_ms_timestamp since CreateTableAuthorizationHeader() corrupts x_ms_timestamp
   char x_ms_timestampCopy[35] {0};
 
   strcpy((char *)x_ms_timestampCopy, x_ms_timestamp );
@@ -206,11 +206,9 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
    // addBufAddress = (uint8_t *)addBuffer;
 
    //az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
-
-   az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
    
-
-
+   /*
+   az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
    uint8_t remainderBuffer[1];
    uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
    //az_span remainder = az_span_create(remainderBufAddress, 900);
@@ -234,7 +232,28 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
   //az_span content_to_upload = az_span_create_from_str((char *)addBufAddress);
   az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
-  
+  */
+
+ az_span remainder = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
+
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li1));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li2));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li3));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li4));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li5));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li6));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li7));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li8));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li9));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li10));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li11));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li12));
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li13));
+            
+   az_span_copy_u8(remainder, 0);
+
+   az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
+
 
   Serial.println(F("Gathered Content_to_upload"));
    
@@ -258,10 +277,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   //CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
   //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
 
-  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (char *)x_ms_timestampCopy, HttpVerb, 
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, 
   contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
       
-  Serial.println("Created authorization header");
+  Serial.println(F("Created authorization header"));
   
 
   az_storage_tables_client tabClient;        
@@ -318,7 +337,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
  
 
   __unused az_result table_create_result =  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), 
-      az_span_create_from_str((char *)x_ms_timestampCopy), &uploadOptions, &http_response);
+      az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
 
   az_http_response_status_line statusLine;
 
@@ -346,8 +365,8 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   char SampleTime[26] {0};
   az_span_to_str(SampleTime, sizeof(SampleTime), pEntity.SampleTime);
     
-  char x_ms_timestamp[35] {0};
-  char timestamp[22] {0};
+  //char x_ms_timestamp[35] {0};
+  //char timestamp[22] {0};
 
   //GetDateHeader(sysTime.getTime(), timestamp, x_ms_timestamp);
   GetDateHeader(pDateTimeUtcNow, timestamp, x_ms_timestamp);
@@ -368,8 +387,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   az_span outPropertySpan = az_span_create(BufAddress, PROPERTIES_BUFFER_LENGTH);
   */
   
-  uint8_t BuffAdd[PROPERTIES_BUFFER_LENGTH] {0};
-  az_span outPropertySpan = AZ_SPAN_FROM_BUFFER(BuffAdd);
+  //uint8_t BuffAdd[PROPERTIES_BUFFER_LENGTH] {0};
+  //az_span outPropertySpan = AZ_SPAN_FROM_BUFFER(BuffAdd);
+
+  az_span outPropertySpan = az_span_create(_propertiesPtr, PROPERTIES_BUFFER_LENGTH);
 
   size_t outBytesWritten = 0;
 
@@ -391,7 +412,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   const char * PROGMEM li10  = "',RowKey='";
         char * li11  = (char *)RowKey; 
   const char * PROGMEM li12  = "')</id><title /><updated>";
-        char * li13  = (char *)x_ms_timestampCopy;
+        char * li13  = (char *)x_ms_timestamp;
   const char * PROGMEM li14  = "</updated><author><name /></author><content type=\"application/atom+xml\">";
   const char * PROGMEM li15  = "<m:properties><d:PartitionKey>";
         char * li16  = (char *)PartitionKey;
@@ -427,13 +448,16 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
 
    //az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
-   az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
+   
+   //az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
 
-   uint8_t remainderBuffer[1];
-   uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
-   az_span remainder = az_span_create(remainderBufAddress, 900);
+   //uint8_t remainderBuffer[1];
+   //uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
 
-            remainder = az_span_copy(startContent_to_upload, az_span_create_from_str((char *)li1));
+
+   az_span remainder = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
+
+            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li1));
             remainder = az_span_copy(remainder, az_span_create_from_str((char *)li2));
             remainder = az_span_copy(remainder, az_span_create_from_str((char *)li3));
             remainder = az_span_copy(remainder, az_span_create_from_str((char *)li4));
@@ -459,6 +483,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   az_span_copy_u8(remainder, 0);
   
   //az_span content_to_upload = az_span_create_from_str((char *)addBufAddress);
+
   az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
 
              
@@ -476,7 +501,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   char authorizationHeaderBuffer[65] {0};
 
   //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
-  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestampCopy, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
 
   // Create client to handle request    
   az_storage_tables_client tabClient;        
@@ -488,7 +513,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
       != AZ_OK)
   {
       // possible breakpoint, if some something went wrong
-      //volatile int dummy643 = 1;    
+      volatile int dummy643 = 1;    
   }
   
   /*
@@ -496,15 +521,29 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
    uint8_t * responseBufferAddr = (uint8_t *)RESPONSE_BUFFER_MEMORY_ADDR;
   az_span response_az_span = az_span_create(responseBufferAddr, RESPONSE_BUFFER_LENGTH);
   */
-   
+  
+  /*
    uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
   az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
+  */
 
+  Serial.printf("Response Buffer starts at: %09x \r\n", (uint32_t)_responsePtr);
+
+  az_span response_az_span = az_span_create(_responsePtr, RESPONSE_BUFFER_LENGTH);
+  //az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
+
+  /*
+  az_http_response http_response;
+  if (az_http_response_init(&http_response, response_az_span) != AZ_OK)
+  {
+    //volatile int dummy645 = 1; 
+  }
+  */
   
   az_http_response http_response;
   if (az_result_failed(az_http_response_init(&http_response, response_az_span)))
   {
-     //volatile int dummy644 = 1;
+     volatile int dummy644 = 1;
   }
    
   az_storage_tables_upload_options uploadOptions = az_storage_tables_upload_options_default();
@@ -519,7 +558,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setWiFiClient(_wifiClient);
 
   __unused az_result const entity_upload_result = 
-    az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestampCopy), &uploadOptions, &http_response);
+    az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
     
     az_http_response_status_line statusLine;
 

@@ -3,7 +3,8 @@
 // Heap Memory Allocation
 // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/mem_alloc.html
 
-
+// Change Stack size which is per default 4096 to 8192
+// user/platformio/packages/framework-arduinoespressif32/tools/sdk/sdkconfig 
 #include <Arduino.h>
 #include <time.h>
 //#include "platform_time.h"
@@ -55,7 +56,7 @@
 
 
 
-uint8_t bufferStore[3000] {0};
+uint8_t bufferStore[3500] {0};
 uint8_t * bufferStorePtr = nullptr;
 
 #define GPIOPin 0

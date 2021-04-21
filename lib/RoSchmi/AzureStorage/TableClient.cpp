@@ -12,6 +12,9 @@ const char * _caCert;
 uint8_t * _requestPtr;
 uint8_t * _responsePtr;
 
+//volatile static char x_ms_timestamp[35] {0};
+//volatile static char timestamp[22] {0};
+
 
 
 
@@ -36,6 +39,11 @@ void TableClient::CreateTableAuthorizationHeader(const char * content, const cha
 {  
     char contentTypeString[25] {0};
 
+    char _timeStamp[35] {0};
+    strcpy(_timeStamp, ptimeStamp);
+
+
+
     az_span_to_str(contentTypeString, (az_span_size(pContentType) + 1), pContentType);                                                                              
     
     if (!useSharedKeyLite)
@@ -51,17 +59,17 @@ void TableClient::CreateTableAuthorizationHeader(const char * content, const cha
 
         // Convert to hex-string
         stringToHexString(pMD5HashHex, md5HashStr, (const char *)"");
-        String theString = pMD5HashHex;   
+        //String theString = pMD5HashHex;   
     }
                         
     char toSign[(strlen(canonicalResource) + 100)];  // if counted correctly, at least 93 needed
     if (useSharedKeyLite)
     {       
-        sprintf(toSign, "%s\%s", (char *)ptimeStamp, canonicalResource);                      
+        sprintf(toSign, "%s\%s", (char *)_timeStamp, canonicalResource);                      
     }
     else
     {     
-        sprintf(toSign, "%s\n%s\n%s\n%s\n%s", pHttpVerb, pMD5HashHex , (char *)contentTypeString, (char *)ptimeStamp, canonicalResource);                       
+        sprintf(toSign, "%s\n%s\n%s\n%s\n%s", pHttpVerb, pMD5HashHex , (char *)contentTypeString, (char *)_timeStamp, canonicalResource);                       
     }
             
     // Produce Authentication Header
@@ -148,16 +156,20 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
    }
 
    // RoSchmi 
-   Serial.println("Reached Create Table");
+   Serial.println(F("Reached Create Table"));
 
    
-
+   //volatile DateTime theCopy = pDateTimeUtcNow;
            
   char x_ms_timestamp[35] {0};
   char timestamp[22] {0};
 
   //GetDateHeader(sysTime.getTime(), timestamp, x_ms_timestamp);
   GetDateHeader(pDateTimeUtcNow, timestamp, x_ms_timestamp);
+
+  char x_ms_timestampCopy[35] {0};
+
+  strcpy((char *)x_ms_timestampCopy, x_ms_timestamp );
 
 
   String timestampUTC = timestamp;
@@ -181,7 +193,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
           char * li12 = (char *)validTableName;
     const char * PROGMEM li13 = "</d:TableName></m:properties></content></entry>";
 
-   Serial.println("Processed XML");
+   Serial.println(F("Processed XML"));
    
            
   // Create the body of the request
@@ -201,7 +213,8 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
    uint8_t remainderBuffer[1];
    uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
-   az_span remainder = az_span_create(remainderBufAddress, 900);
+   //az_span remainder = az_span_create(remainderBufAddress, 900);
+   az_span remainder = az_span_create(_requestPtr, 900);
 
             remainder = az_span_copy(startContent_to_upload, az_span_create_from_str((char *)li1));
             remainder = az_span_copy(remainder, az_span_create_from_str((char *)li2));
@@ -223,7 +236,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
   
 
-  Serial.println("Gathered Content_to_upload");
+  Serial.println(F("Gathered Content_to_upload"));
    
 
   String urlPath = validTableName;
@@ -242,7 +255,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
   //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
 
-  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
+  //CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
+  //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (char *)x_ms_timestampCopy, HttpVerb, 
   contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
       
   Serial.println("Created authorization header");
@@ -265,11 +281,16 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
   //uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
 
-  volatile uint8_t * responseBufferPtr = &responseBuffer[0];
+  //volatile uint8_t * responseBufferPtr = &responseBuffer[0];
 
-  Serial.printf("Response Buffer starts at: %09x \r\n", (uint32_t)responseBufferPtr);
+  //volatile uint8_t * responseBufferPtr = _responsePtr;
 
-  az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
+
+
+  Serial.printf("Response Buffer starts at: %09x \r\n", (uint32_t)_responsePtr);
+
+  az_span response_az_span = az_span_create(_responsePtr, RESPONSE_BUFFER_LENGTH);
+  //az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
 
   
   az_http_response http_response;
@@ -293,11 +314,11 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setCaCert(_caCert);
   setWiFiClient(_wifiClient);
   
-  Serial.println("Standing before upload");
+  Serial.println(F("Standing before upload"));
  
 
   __unused az_result table_create_result =  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), 
-      az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
+      az_span_create_from_str((char *)x_ms_timestampCopy), &uploadOptions, &http_response);
 
   az_http_response_status_line statusLine;
 
@@ -333,6 +354,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   String timestampUTC = timestamp;
   timestampUTC += ".0000000Z";
 
+  char x_ms_timestampCopy[35] {0};
+
+  strcpy((char *)x_ms_timestampCopy, x_ms_timestamp );
+
   az_span contentTypeAzSpan = getContentType_az_span(pContentType);
   az_span responseTypeAzSpan = getResponseType_az_span(pResponseType);
   az_span acceptTypeAzSpan = getAcceptType_az_span(pAcceptType);
@@ -366,7 +391,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   const char * PROGMEM li10  = "',RowKey='";
         char * li11  = (char *)RowKey; 
   const char * PROGMEM li12  = "')</id><title /><updated>";
-        char * li13  = (char *)x_ms_timestamp;
+        char * li13  = (char *)x_ms_timestampCopy;
   const char * PROGMEM li14  = "</updated><author><name /></author><content type=\"application/atom+xml\">";
   const char * PROGMEM li15  = "<m:properties><d:PartitionKey>";
         char * li16  = (char *)PartitionKey;
@@ -451,7 +476,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   char authorizationHeaderBuffer[65] {0};
 
   //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
-  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestampCopy, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
 
   // Create client to handle request    
   az_storage_tables_client tabClient;        
@@ -494,7 +519,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setWiFiClient(_wifiClient);
 
   __unused az_result const entity_upload_result = 
-    az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
+    az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestampCopy), &uploadOptions, &http_response);
     
     az_http_response_status_line statusLine;
 

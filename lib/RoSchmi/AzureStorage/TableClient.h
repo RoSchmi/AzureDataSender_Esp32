@@ -53,7 +53,9 @@ public:
      // RoSchm
     // Buffers defined volatile to be placed in .dram0.bss memory segment
     //volatile uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
-    volatile uint8_t responseBuffer[1000] {0};
+
+
+    //volatile uint8_t responseBuffer[1000] {0};
 
     
     

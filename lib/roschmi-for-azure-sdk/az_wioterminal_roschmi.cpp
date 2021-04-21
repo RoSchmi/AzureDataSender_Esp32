@@ -114,15 +114,10 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   }
   String resource = slashIndex != -1 ? (char *)workBuffer : "";
   
-
   uint16_t port = (strcmp(protocol, (char *)"http") == 0) ? 80 : 443;
 
   devHttp->setReuse(false);
   
-  
-   
-  
-    
   if (port == 80)      // http ?
   { 
     Serial.println("Port = 80");
@@ -140,7 +135,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
     //devHttp->begin(* devWifiClient, (const char *)workBuffer, port, slashIndex != -1 ? (const char *)workBuffer : "", true);    
   }
   
-  Serial.println("Standing after begin");
+  Serial.println(F("Standing after begin"));
   
 
     
@@ -149,19 +144,19 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   az_span head_name = AZ_SPAN_FROM_BUFFER(name_buffer);
   az_span head_value = AZ_SPAN_FROM_BUFFER(value_buffer);
     
-  Serial.println("Before strings");
+  Serial.println(F("Before strings"));
   
   char strInit[2] {0};
   String nameString = (char *)strInit;
   String valueString = (char *)strInit;
 
-  Serial.println("After strings");
+  Serial.println(F("After strings"));
   
   
 
   for (int32_t offset = (headerCount - 1); offset >= 0; offset--)
   {
-      Serial.println("Am in loop");
+      Serial.println(F("Am in loop"));
       Serial.println(offset);
       char buf[50] {0};
       az_span_to_str(buf, 49, head_name);
@@ -177,7 +172,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
     */
   
     _az_RETURN_IF_FAILED(az_http_request_get_header(request, offset, &head_name, &head_value));
-       Serial.println("Get first header");
+       Serial.println(F("Get first header"));
 
   
       
@@ -187,7 +182,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
     valueString = (char *)value_buffer;
 
     devHttp->addHeader(nameString, valueString, true, true);
-    Serial.println("After adding first header ");
+    Serial.println(F("After adding first header "));
 
   
 
@@ -195,12 +190,14 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   }
 
 
-  Serial.println("After adding headers ");
+  Serial.println(F("After adding headers "));
   
 
   // int32_t bodySize = request->_internal.body._internal.size;
 
   uint8_t * theBody = request->_internal.body._internal.ptr;
+
+  volatile uint8_t * theBodyCopy = theBody;
   
   char requMethodBuf[100] = {0};
   az_span_to_str(requMethodBuf, 99, requMethod);
@@ -208,7 +205,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   
   if (az_span_is_content_equal(requMethod, AZ_SPAN_LITERAL_FROM_STR("POST")))
   {  
-    Serial.println("In POST routine");
+    Serial.println(F("In POST routine"));
       
     const char * headerKeys[] = {"ETag", "Date", "x-ms-request-id", "x-ms-version", "Content-Type"};       
     devHttp->collectHeaders(headerKeys, 5);
@@ -244,6 +241,8 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
           appendResult = az_http_response_append(ref_response, az_span_create_from_str((char *)httpStatusLine));
 
           size_t respHeaderCount = devHttp->headers();
+
+          //Serial.printf("Header Count: %d", respHeaderCount);
 
           for (size_t i = 0; i < respHeaderCount; i++)
           {       

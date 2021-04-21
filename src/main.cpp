@@ -53,8 +53,13 @@
 
 #include "Esp.h"
 
-uint8_t bufferStore[2000] {0};
+
+
+uint8_t bufferStore[3000] {0};
 uint8_t * bufferStorePtr = nullptr;
+
+#define GPIOPin 0
+bool buttonPressed = false;
 
 const char analogTableName[45] = ANALOG_TABLENAME;
 
@@ -142,7 +147,13 @@ int32_t sysTimeNtpDelta = 0;
 static bool UseHttps_State = TRANSPORT_PROTOCOL == 0 ? false : true;
 
 CloudStorageAccount myCloudStorageAccount(AZURE_CONFIG_ACCOUNT_NAME, AZURE_CONFIG_ACCOUNT_KEY, UseHttps_State);
-CloudStorageAccount * myCloudStorageAccountPtr = &myCloudStorageAccount; 
+CloudStorageAccount * myCloudStorageAccountPtr = &myCloudStorageAccount;
+
+void GPIOPinISR()
+{
+  buttonPressed = true;
+   
+}
 
 // function forward declaration
 void scan_WIFI();
@@ -162,6 +173,17 @@ int getWeekOfMonthNum(const char * weekOfMonth);
 void setup() {
   Serial.begin(115200);
   //while (!Serial);
+
+  attachInterrupt(GPIOPin, GPIOPinISR, RISING);
+
+  delay(2000);
+  Serial.println("\r\n\r\nPress Boot Button to continue!");
+
+  // Wait on press and release of boot button
+  while (!buttonPressed)
+  {
+    delay(100);
+  }
 
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -298,7 +320,8 @@ timeClient.begin();
   Serial.println("LOC EPOCH : " + String(timeClient.getEpochTime()));
 
   unsigned long utcTime = timeClient.getUTCEpochTime();  // Seconds since 1. Jan. 1970
-  dateTimeUTCNow =  utcTime + SECONDS_FROM_1970_TO_2000;
+  //dateTimeUTCNow =  utcTime + SECONDS_FROM_1970_TO_2000;
+  dateTimeUTCNow =  utcTime;
 
   Serial.printf("%s %i %i %i %i %i", (char *)"UTC-Time is  :", dateTimeUTCNow.year(), 
                                         dateTimeUTCNow.month() , dateTimeUTCNow.day(),
@@ -332,7 +355,8 @@ void loop()
       if (timeClient.update())
       {                                                                  
         
-        dateTimeUTCNow = timeClient.getUTCEpochTime() + SECONDS_FROM_1970_TO_2000;
+        //dateTimeUTCNow = timeClient.getUTCEpochTime() + SECONDS_FROM_1970_TO_2000;
+        dateTimeUTCNow = timeClient.getUTCEpochTime();
         
         timeNtpUpdateCounter++;
 
@@ -344,7 +368,8 @@ void loop()
         #endif
       }  // End NTP stuff
        
-      dateTimeUTCNow = timeClient.getUTCEpochTime() + SECONDS_FROM_1970_TO_2000;
+      //dateTimeUTCNow = timeClient.getUTCEpochTime() + SECONDS_FROM_1970_TO_2000;
+      dateTimeUTCNow = timeClient.getUTCEpochTime();
       
       // Get offset in minutes between UTC and local time with consideration of DST
       int timeZoneOffsetUTC = myTimezone.utcIsDST(dateTimeUTCNow.unixtime()) ? TIMEZONEOFFSET + DSTOFFSET : TIMEZONEOFFSET;

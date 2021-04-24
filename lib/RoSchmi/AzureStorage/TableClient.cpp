@@ -134,7 +134,8 @@ TableClient::TableClient(CloudStorageAccount * account, const char * caCert, HTT
     _caCert = caCert;
     _httpPtr = httpClient;
     _wifiClient = wifiClient;
-
+    
+    // Some buffers are positioned in memory segment .bss to have mor place for the stack
     _requestPtr = bufferStorePtr;
     _propertiesPtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH;
     _responsePtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH + PROPERTIES_BUFFER_LENGTH;
@@ -154,16 +155,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
       validTableName[MAX_TABLENAME_LENGTH] = '\0';
    }
 
-   // RoSchmi 
-   Serial.println(F("Reached Create Table"));
-
    
-   //volatile DateTime theCopy = pDateTimeUtcNow;
-           
-  //char x_ms_timestamp[35] {0};
-  //char timestamp[22] {0};
-
-  //GetDateHeader(sysTime.getTime(), timestamp, x_ms_timestamp);
   GetDateHeader(pDateTimeUtcNow, timestamp, x_ms_timestamp);
   
   // Need copy of x_ms_timestamp since CreateTableAuthorizationHeader() corrupts x_ms_timestamp
@@ -193,46 +185,7 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
           char * li12 = (char *)validTableName;
     const char * PROGMEM li13 = "</d:TableName></m:properties></content></entry>";
 
-   Serial.println(F("Processed XML"));
    
-           
-  // Create the body of the request
-   // To save memory for heap, allocate buffer which can hold 900 bytes at adr 0x20029200
-   
-   //uint8_t addBuffer[REQUEST_BODY_BUFFER_LENGTH];
-   //uint8_t * addBufAddress = (uint8_t *)addBuffer;
-
-   //addBufAddress = (uint8_t *)REQUEST_BODY_BUFFER_MEMORY_ADDR;
-   // addBufAddress = (uint8_t *)addBuffer;
-
-   //az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
-   
-   /*
-   az_span startContent_to_upload = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
-   uint8_t remainderBuffer[1];
-   uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
-   //az_span remainder = az_span_create(remainderBufAddress, 900);
-   az_span remainder = az_span_create(_requestPtr, 900);
-
-            remainder = az_span_copy(startContent_to_upload, az_span_create_from_str((char *)li1));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li2));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li3));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li4));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li5));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li6));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li7));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li8));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li9));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li10));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li11));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li12));
-            remainder = az_span_copy(remainder, az_span_create_from_str((char *)li13));
-            
-   az_span_copy_u8(remainder, 0);
-
-  //az_span content_to_upload = az_span_create_from_str((char *)addBufAddress);
-  az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
-  */
 
  az_span remainder = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
 
@@ -254,10 +207,6 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
    az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
 
-
-  Serial.println(F("Gathered Content_to_upload"));
-   
-
   String urlPath = validTableName;
   String TableEndPoint = _accountPtr->UriEndPointTable;
   String Host = _accountPtr->HostNameTable;
@@ -271,11 +220,6 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
 
   char authorizationHeaderBuffer[100] {0};
 
-  //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
-  //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
-
-  //CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, 
-  //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
 
   CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, 
   contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
@@ -333,9 +277,6 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setCaCert(_caCert);
   setWiFiClient(_wifiClient);
   
-  Serial.println(F("Standing before upload"));
- 
-
   __unused az_result table_create_result =  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), 
       az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
 

@@ -56,7 +56,7 @@
 
 
 
-uint8_t bufferStore[3000] {0};
+uint8_t bufferStore[3500] {0};
 uint8_t * bufferStorePtr = nullptr;
 
 #define GPIOPin 0
@@ -176,9 +176,22 @@ void setup() {
   //while (!Serial);
 
   attachInterrupt(GPIOPin, GPIOPinISR, RISING);
+  
+  TaskHandle_t taskHandle_0 =  xTaskGetCurrentTaskHandleForCPU(0);
+  TaskHandle_t taskHandle_1 =  xTaskGetCurrentTaskHandleForCPU(1);
+  
+  
+  UBaseType_t watermarkStart_0 = uxTaskGetStackHighWaterMark(taskHandle_0);
+  UBaseType_t watermarkStart_1 = uxTaskGetStackHighWaterMark(NULL);
+
+  Serial.print(F("\r\nWatermark for core_0 at start is: "));
+  Serial.println(watermarkStart_0);
+  Serial.print(F("Watermark for core_1 at start is: "));
+  Serial.println(watermarkStart_1);
+
 
   delay(2000);
-  Serial.println("\r\n\r\nPress Boot Button to continue!");
+  Serial.println(F("\r\n\r\nPress Boot Button to continue!"));
 
   // Wait on press and release of boot button
   while (!buttonPressed)
@@ -488,6 +501,8 @@ void loop()
             augmentedAnalogTableName += (dateTimeUTCNow.year());     
           }
           
+          //RoSchmi
+          
           // Create Azure Storage Table if table doesn't exist
           if (localTime.year() != dataContainer.Year)    // if new year
           {  
@@ -500,8 +515,7 @@ void loop()
             else
             {
               // Reset board if not successful
-              //https://forum.pjrc.com/threads/59935-Reboot-Teensy-programmatically?p=232143&viewfull=1#post232143
-              //Reset Teensy 4.1
+             
              //SCB_AIRCR = 0x05FA0004;             
             }                     
           }
@@ -1088,6 +1102,10 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
     delay(1000);
     //NVIC_SystemReset();     // Makes Code 64  
   }
+  UBaseType_t watermarkTableCreate_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 after first Table Create is: "));
+  Serial.println(watermarkTableCreate_1);
+
 return statusCode;
 }
 
@@ -1201,6 +1219,9 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
     #endif
     delay(1000);
   }
+  UBaseType_t watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 after first Entity Insert is: "));
+  Serial.println(watermarkEntityInsert_1);
   return statusCode;
 }
 

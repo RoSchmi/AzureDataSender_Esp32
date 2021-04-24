@@ -86,7 +86,7 @@
 #define  DST_STOP_HOUR               3       // 0 - 23
        
 
-#define TRANSPORT_PROTOCOL 0           // 0 = http, 1 = https
+#define TRANSPORT_PROTOCOL 1          // 0 = http, 1 = https
                                  
 
 #define USE_STATIC_IP 0                // 1 = use static IpAddress, 0 = use DHCP

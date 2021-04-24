@@ -12,6 +12,7 @@ const char * _caCert;
 uint8_t * _requestPtr;
 uint8_t * _propertiesPtr;
 uint8_t * _responsePtr;
+uint8_t * _authorizationHeaderBufferPtr;
 
 char x_ms_timestamp[35] {0};
 char timestamp[22] {0};
@@ -138,7 +139,8 @@ TableClient::TableClient(CloudStorageAccount * account, const char * caCert, HTT
     // Some buffers are positioned in memory segment .bss to have mor place for the stack
     _requestPtr = bufferStorePtr;
     _propertiesPtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH;
-    _responsePtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH + PROPERTIES_BUFFER_LENGTH;
+    _authorizationHeaderBufferPtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH + PROPERTIES_BUFFER_LENGTH;
+    _responsePtr = bufferStorePtr + REQUEST_BODY_BUFFER_LENGTH + PROPERTIES_BUFFER_LENGTH + AUTH_HEADER_BUFFER_LENGTH;
 
 }
 TableClient::~TableClient()
@@ -155,8 +157,17 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
       validTableName[MAX_TABLENAME_LENGTH] = '\0';
    }
 
-   
+   UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark at start of Create Table  is: "));
+  Serial.println(watermarkEntityInsert_1);
+
+
   GetDateHeader(pDateTimeUtcNow, timestamp, x_ms_timestamp);
+
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark at after GetDateHeader  is: "));
+  Serial.println(watermarkEntityInsert_1);
+
   
   // Need copy of x_ms_timestamp since CreateTableAuthorizationHeader() corrupts x_ms_timestamp
   char x_ms_timestampCopy[35] {0};
@@ -171,6 +182,42 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   az_span responseTypeAzSpan = getResponseType_az_span(pResponseType);
   az_span acceptTypeAzSpan = getAcceptType_az_span(pAcceptType);
 
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark at before Flashstringhelper  is: "));
+  Serial.println(watermarkEntityInsert_1);
+
+  //************************************************
+
+   const __FlashStringHelper * li1 = (F("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"));
+    const __FlashStringHelper * li2 = (F("<entry xmlns:d=\"http://schemas.microsoft.com/ado/2007/08/dataservices\"  "));
+    const __FlashStringHelper * li3 = (F("xmlns:m=\"http://schemas.microsoft.com/ado/2007/08/dataservices/metadata\" "));
+    const __FlashStringHelper * li4 = (F("xmlns=\"http://www.w3.org/2005/Atom\"> <id>http://"));
+          char * li5 = (char *)_accountPtr->AccountName.c_str();
+    const __FlashStringHelper * li6 = (F(".table.core.windows.net/Tables('"));
+          char * li7 = (char *)validTableName;
+    const __FlashStringHelper * li8 = (F("')</id><title /><updated>"));
+          char * li9 = (char *)timestampUTC.c_str();
+    const __FlashStringHelper * li10 = (F("</updated><author><name/></author> "));
+    const __FlashStringHelper * li11 = (F("<content type=\"application/xml\"><m:properties><d:TableName>"));
+          char * li12 = (char *)validTableName;
+    const __FlashStringHelper * li13 = (F("</d:TableName></m:properties></content></entry>"));
+
+
+  /*
+  uint8_t addBuffer[REQUEST_BODY_BUFFER_LENGTH] {0};
+  uint8_t * addBufAddress = (uint8_t *)addBuffer;
+
+   az_span startContent_to_upload = az_span_create(addBufAddress, REQUEST_BODY_BUFFER_LENGTH);
+
+   uint8_t remainderBuffer[1];
+   uint8_t * remainderBufAddress = (uint8_t *)remainderBuffer;
+   az_span remainder = az_span_create(remainderBufAddress, 900);
+   */
+
+  //****************************************************************
+
+
+    /*
     const char * PROGMEM li1 = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>";
     const char * PROGMEM li2 = "<entry xmlns:d=\"http://schemas.microsoft.com/ado/2007/08/dataservices\"  ";
     const char * PROGMEM li3 = "xmlns:m=\"http://schemas.microsoft.com/ado/2007/08/dataservices/metadata\" ";
@@ -185,7 +232,11 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
           char * li12 = (char *)validTableName;
     const char * PROGMEM li13 = "</d:TableName></m:properties></content></entry>";
 
-   
+    */
+
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark at before az_span remainder  is: "));
+  Serial.println(watermarkEntityInsert_1);
 
  az_span remainder = az_span_create(_requestPtr, REQUEST_BODY_BUFFER_LENGTH);
 
@@ -205,6 +256,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
             
    az_span_copy_u8(remainder, 0);
 
+   watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark at after az_span remainder  is: "));
+  Serial.println(watermarkEntityInsert_1);
+
    az_span content_to_upload = az_span_create_from_str((char *)_requestPtr);
 
   String urlPath = validTableName;
@@ -218,13 +273,24 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   
   char md5Buffer[32 +1] {0};
 
-  char authorizationHeaderBuffer[100] {0};
+  //char authorizationHeaderBuffer[100] {0};
+  //_authorizationHeaderBufferPtr
+
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 before CreateTableAuthorizationHeader is: "));
+  Serial.println(watermarkEntityInsert_1);
 
 
+  //CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, 
+  //contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
   CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, 
-  contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  contentTypeAzSpan, md5Buffer, (char *)_authorizationHeaderBufferPtr, useSharedKeyLite);
       
   Serial.println(F("Created authorization header"));
+
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 after CreateTableAuthorizationHeader is: "));
+  Serial.println(watermarkEntityInsert_1);
   
 
   az_storage_tables_client tabClient;        
@@ -277,7 +343,10 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setCaCert(_caCert);
   setWiFiClient(_wifiClient);
   
-  __unused az_result table_create_result =  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), 
+  //__unused az_result table_create_result =  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), 
+  //    az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
+
+   __unused az_result table_create_result =  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)_authorizationHeaderBufferPtr), 
       az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
 
   az_http_response_status_line statusLine;
@@ -439,10 +508,11 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   
   // Create buffers to hold the results of MD5-hash and the value of the authorizationheader
   char md5Buffer[32 +1] {0};
-  char authorizationHeaderBuffer[65] {0};
+  //char authorizationHeaderBuffer[65] {0};
 
   //CreateTableAuthorizationHeader((char *)addBufAddress, accountName_and_Tables, (const char *)x_ms_timestamp, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
-  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  //CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, contentTypeAzSpan, md5Buffer, authorizationHeaderBuffer, useSharedKeyLite);
+  CreateTableAuthorizationHeader((char *)_requestPtr, accountName_and_Tables, x_ms_timestampCopy, HttpVerb, contentTypeAzSpan, md5Buffer, (char *)_authorizationHeaderBufferPtr, useSharedKeyLite);
 
   // Create client to handle request    
   az_storage_tables_client tabClient;        
@@ -498,8 +568,11 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setCaCert(_caCert);
   setWiFiClient(_wifiClient);
 
-  __unused az_result const entity_upload_result = 
-    az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
+  //__unused az_result const entity_upload_result = 
+  //  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
+
+    __unused az_result const entity_upload_result = 
+    az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)_authorizationHeaderBufferPtr), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
     
     az_http_response_status_line statusLine;
 

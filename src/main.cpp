@@ -59,6 +59,8 @@
 uint8_t bufferStore[3500] {0};
 uint8_t * bufferStorePtr = nullptr;
 
+
+
 #define GPIOPin 0
 bool buttonPressed = false;
 
@@ -213,6 +215,9 @@ void setup() {
   uint32_t freeHeapSize = esp_get_free_heap_size();
   Serial.print(F("Free Heap: "));
   Serial.println(freeHeapSize);
+
+  void* SpStart = NULL;
+  Serial.printf("Stackpointer near start is: %p \r\n", (void*)&SpStart);
 
   
   bufferStore[0] = 0x32;
@@ -474,7 +479,8 @@ void loop()
       {    
         //Create some buffer
         char sampleTime[25] {0};    // Buffer to hold sampletime        
-        char strData[100];          // Buffer to hold display message  
+        char strData[100] {0};          // Buffer to hold display message
+        
         char EtagBuffer[50] {0};    // Buffer to hold returned Etag
 
         // Create az_span to hold partitionkey
@@ -1073,7 +1079,15 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
       //SAMCrashMonitor::iAmAlive();
   #endif
 
+  UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 before creating table (create) is: "));
+  Serial.println(watermarkEntityInsert_1);
+
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
+
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 after creating table (create) is: "));
+  Serial.println(watermarkEntityInsert_1);
 
   // Create Table
   az_http_status_code statusCode = table.CreateTable(pTableName, dateTimeUTCNow, contApplicationIatomIxml, acceptApplicationIjson, returnContent, false);
@@ -1111,6 +1125,10 @@ return statusCode;
 
 az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Certificate pCaCert, const char * pTableName, TableEntity pTableEntity, char * outInsertETag)
 { 
+  UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 at start of insertTableEntity is: "));
+  Serial.println(watermarkEntityInsert_1);
+
   #if TRANSPORT_PROTOCOL == 1
     static WiFiClientSecure wifi_client;
   #else
@@ -1135,7 +1153,16 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   #endif
   */
 
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 at before TableClient is: "));
+  Serial.println(watermarkEntityInsert_1);
+
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
+
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 before TableClient is: "));
+  Serial.println(watermarkEntityInsert_1);
+
   
   #if WORK_WITH_WATCHDOG == 1
       //SAMCrashMonitor::iAmAlive();
@@ -1219,7 +1246,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
     #endif
     delay(1000);
   }
-  UBaseType_t watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
   Serial.print(F("Watermark for core_1 after first Entity Insert is: "));
   Serial.println(watermarkEntityInsert_1);
   return statusCode;

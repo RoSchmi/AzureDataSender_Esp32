@@ -134,25 +134,16 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
     devHttp->begin(* devWifiClient, host, port, resource, true);
     //devHttp->begin(* devWifiClient, (const char *)workBuffer, port, slashIndex != -1 ? (const char *)workBuffer : "", true);    
   }
-  
-  Serial.println(F("Standing after begin"));
-  
-
     
   char name_buffer[MAX_HEADERNAME_LENGTH +2] {0};
   char value_buffer[MAX_HEADERVALUE_LENGTH +2] {0};
   az_span head_name = AZ_SPAN_FROM_BUFFER(name_buffer);
   az_span head_value = AZ_SPAN_FROM_BUFFER(value_buffer);
     
-  Serial.println(F("Before strings"));
   
   char strInit[2] {0};
   String nameString = (char *)strInit;
   String valueString = (char *)strInit;
-
-  Serial.println(F("After strings"));
-  
-  
 
   for (int32_t offset = (headerCount - 1); offset >= 0; offset--)
   {
@@ -173,20 +164,14 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   
     _az_RETURN_IF_FAILED(az_http_request_get_header(request, offset, &head_name, &head_value));
        Serial.println(F("Get first header"));
-
-  
-      
+   
     az_span_to_str((char *)name_buffer, MAX_HEADERNAME_LENGTH -1, head_name);
     az_span_to_str((char *)value_buffer, MAX_HEADERVALUE_LENGTH -1, head_value);
     nameString = (char *)name_buffer;
     valueString = (char *)value_buffer;
 
     devHttp->addHeader(nameString, valueString, true, true);
-    Serial.println(F("After adding first header "));
-
-  
-
-
+    
   }
 
 
@@ -197,12 +182,6 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
 
   uint8_t * theBody = request->_internal.body._internal.ptr;
 
-  volatile uint8_t * theBodyCopy = theBody;
-  
-  char requMethodBuf[100] = {0};
-  az_span_to_str(requMethodBuf, 99, requMethod);
-  Serial.println(requMethodBuf);
-  
   if (az_span_is_content_equal(requMethod, AZ_SPAN_LITERAL_FROM_STR("POST")))
   {  
     Serial.println(F("In POST routine"));
@@ -211,6 +190,15 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
     devHttp->collectHeaders(headerKeys, 5);
       
     int httpCode = -1;
+
+  
+  UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+  Serial.print(F("Watermark for core_1 before POST is: "));
+  Serial.println(watermarkEntityInsert_1);
+  
+
+  void* pPost = NULL;
+  Serial.printf("\r\nStackpointer before POST is: %p \r\n", (void*)&pPost);
 
     httpCode = devHttp->POST((char *)theBody);
  

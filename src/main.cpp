@@ -56,7 +56,7 @@
 
 
 
-uint8_t bufferStore[3500] {0};
+uint8_t bufferStore[3000] {0};
 uint8_t * bufferStorePtr = nullptr;
 
 #define GPIOPin 0
@@ -272,6 +272,64 @@ void setup() {
     }
   }
 
+  //******************************************************
+
+  //Set WiFi to station mode and disconnect from an AP if it was previously connected
+  WiFi.mode(WIFI_STA);
+  Serial.println("First disconnecting.");
+
+  while (WiFi.status() != WL_DISCONNECTED)
+  {
+    WiFi.disconnect();
+    delay(200); 
+  }
+  WiFi.begin(ssid, password);
+
+if (!WiFi.enableSTA(true))
+{
+  while (true)
+  {
+    // Stay in endless loop to reboot through Watchdog
+    Serial.println("Connect failed.");
+    delay(1000);
+    }
+}
+
+#if USE_WIFI_STATIC_IP == 1
+  if (!WiFi.config(presetIp, presetGateWay, presetSubnet, presetDnsServer1, presetDnsServer2))
+  {
+    while (true)
+    {
+      // Stay in endless loop
+    lcd_log_line((char *)"WiFi-Config failed");
+      delay(3000);
+    }
+  }
+  else
+  {
+    lcd_log_line((char *)"WiFi-Config successful");
+    delay(1000);
+  }
+  #endif
+while (WiFi.status() != WL_CONNECTED)
+  {  
+    delay(100);
+    Serial.print("New WiFi-Status: ");
+    Serial.println((int)WiFi.status());
+    //WiFi.begin(ssid, password);
+  }
+
+  Serial.println(WiFi.localIP());
+  
+  /*
+  while(true)
+  {
+    Serial.println("Connected");
+    delay(1000);
+  }
+  */
+
+  /*
   if(WiFi.status() != WL_CONNECTED){
       scan_WIFI();
       delay(1000);
@@ -283,6 +341,9 @@ void setup() {
         connect_Wifi(ssid, password);        
       }
 }
+*/
+
+
 timeClient.begin();
   timeClient.setUpdateInterval((NTP_UPDATE_INTERVAL_MINUTES < 1 ? 1 : NTP_UPDATE_INTERVAL_MINUTES) * 60 * 1000);
   // 'setRetryInterval' should not be too short, may be that short intervals lead to malfunction 
@@ -683,7 +744,18 @@ boolean connect_Wifi(const char *ssid, const char * password)
   Serial.println(ssid);
   delay(500);
   //Start connecting (done by the ESP in the background)
-  WiFi.begin(ssid, password);
+  
+  #if USE_WIFI_STATIC_IP == 1
+  IPAddress presetIp(192, 168, 1, 83);
+  IPAddress presetGateWay(192, 168, 1, 1);
+  IPAddress presetSubnet(255, 255, 255, 0);
+  IPAddress presetDnsServer1(8,8,8,8);
+  IPAddress presetDnsServer2(8,8,4,4);
+
+  WiFi.config(presetIp, presetGateWay, presetDnsServer1, presetDnsServer2);
+  #endif
+
+  WiFi.begin(ssid, password, 6);
   // read wifi Status
   wl_status_t wifi_Status = WiFi.status();  
   int n_trials = 0;

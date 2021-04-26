@@ -49,23 +49,11 @@ typedef enum
 class TableClient
 {
 public:
-     // RoSchm
-    // Buffers defined volatile to be placed in .dram0.bss memory segment
-    //volatile uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
-
-
-    //volatile uint8_t responseBuffer[1000] {0};
-
-    
-    
+     
     TableClient(CloudStorageAccount *account, const char * caCert, HTTPClient *httpClient, WiFiClient * wifiClient, uint8_t * bufferStore);
-    //TableClient(CloudStorageAccount *account, const char * caCert, HTTPClient *httpClient, WiFiClient * wifiClient);
-
-   
+    
     ~TableClient();
 
-    void Initialize(uint8_t * bufferStorePtr);
-    
     az_http_status_code CreateTable(const char * tableName, DateTime pDateTimeUtcNow, ContType pContentType = ContType::contApplicationIatomIxml, AcceptType pAcceptType = AcceptType::acceptApplicationIjson, ResponseType pResponseType = ResponseType::returnContent, bool useSharedKeyLight = false);
     az_http_status_code InsertTableEntity(const char * tableName, DateTime pDateTimeUtcNow, TableEntity pEntity, char* out_ETAG, DateTime * outResonseHeaderDate, ContType pContentType, AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite = false);   
     void CreateTableAuthorizationHeader(const char * content, const char * canonicalResource, const char * ptimeStamp, const char * pHttpVerb, az_span pConentType, char * pMd5Hash, char pAutorizationHeader[], bool useSharedKeyLite = false);

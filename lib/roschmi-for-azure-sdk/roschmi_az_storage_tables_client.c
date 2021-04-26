@@ -13,6 +13,9 @@
 
 #include <stddef.h>
 
+#include <Arduino.h>
+
+uint8_t * _reqPreparePtr;
 
 enum
 {
@@ -185,7 +188,8 @@ AZ_NODISCARD az_result az_storage_tables_upload(
     az_span authorizationHeader,
     az_span timestamp,
     az_storage_tables_upload_options const* options,
-    az_http_response* ref_response)
+    az_http_response* ref_response,
+    uint8_t * reqPreparePtr)
 {
 
   az_storage_tables_upload_options opt;
@@ -200,6 +204,8 @@ AZ_NODISCARD az_result az_storage_tables_upload(
 
   // Request buffer
   // create request buffer TODO: define size for a blob upload
+  // RoSchmi
+  _reqPreparePtr = reqPreparePtr;
   uint8_t url_buffer[ROSCHMI_AZ_HTTP_REQUEST_URL_BUFFER_SIZE];
   az_span request_url_span = AZ_SPAN_FROM_BUFFER(url_buffer);
   // copy url from client
@@ -209,9 +215,21 @@ AZ_NODISCARD az_result az_storage_tables_upload(
   
   // RoSchmi
   request_url_span = az_span_slice(ref_client->_internal.endpoint, 0, uri_size);
+  
+  //RoSchmi
+  
+  //uint8_t headers_buffer[_az_STORAGE_HTTP_REQUEST_HEADER_BUFFER_SIZE] = {0};
+  
+  //uint8_t headersBuffer[1] = {0};
+  uint8_t * headers_buffer = _reqPreparePtr;
 
-  uint8_t headers_buffer[_az_STORAGE_HTTP_REQUEST_HEADER_BUFFER_SIZE];
-  az_span request_headers_span = AZ_SPAN_FROM_BUFFER(headers_buffer);
+  az_span request_headers_span = az_span_create(headers_buffer, _az_STORAGE_HTTP_REQUEST_HEADER_BUFFER_SIZE);
+
+  //az_span request_headers_span = AZ_SPAN_FROM_BUFFER(headers_buffer);
+
+  void* SpTableClient_1 = NULL;
+  volatile uint32_t RestStack = (uint32_t)&SpTableClient_1 - (uint32_t)0x3ffb0050;
+  
 
   // create request
   az_http_request request;
@@ -223,6 +241,9 @@ AZ_NODISCARD az_result az_storage_tables_upload(
       uri_size,
       request_headers_span,
       content));
+
+      void* SpTableClient_2 = NULL;
+  RestStack = (uint32_t)&SpTableClient_2 - (uint32_t)0x3ffb0050;
     
  _az_RETURN_IF_FAILED(az_http_request_append_header(
       &request, AZ_STORAGE_TABLES_HEADER_ACCEPT_TYPE, options->_internal.acceptType));
@@ -258,6 +279,8 @@ _az_RETURN_IF_FAILED(az_http_request_append_header(
  _az_RETURN_IF_FAILED(
      az_http_request_append_header(&request, AZ_HTTP_HEADER_ACCEPT_ENCODING, AZ_HTTP_ACCEPT_ENCODING_IDENTITY));
 
+  void* SpTableClient_3 = NULL;
+  RestStack = (uint32_t)&SpTableClient_3 - (uint32_t)0x3ffb0050;
     
 
 az_span urlWorkCopy = ref_client->_internal.endpoint;
@@ -313,6 +336,10 @@ _az_RETURN_IF_FAILED(
   // add Content-Length to request
   _az_RETURN_IF_FAILED(
       az_http_request_append_header(&request, AZ_HTTP_HEADER_CONTENT_LENGTH, content_length_span));
+
+  
+void* SpTableClient_4 = NULL;
+  RestStack = (uint32_t)&SpTableClient_4 - (uint32_t)0x3ffb0050;
 
 
   //_az_RETURN_IF_FAILED(

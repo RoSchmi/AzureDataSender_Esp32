@@ -172,7 +172,8 @@ AZ_NODISCARD az_result az_storage_tables_upload(
     az_span authorizationHeader,
     az_span timestamp,
     az_storage_tables_upload_options const* options,
-    az_http_response* ref_response);
+    az_http_response* ref_response,
+    uint8_t * reqPreparePtr);
 
 #include <azure/core/_az_cfg_suffix.h>
 

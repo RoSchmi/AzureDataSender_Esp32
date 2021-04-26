@@ -50,7 +50,12 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   _az_PRECONDITION_NOT_NULL(request);
   _az_PRECONDITION_NOT_NULL(ref_response);
 
+  void* SpTableClient_5 = NULL;
+  volatile uint32_t RestStack = (uint32_t)&SpTableClient_5 - (uint32_t)0x3ffb0050;
+
    Serial.println(F("az_http_client_send_request"));
+
+ 
     
 
   // Working with spans
@@ -198,7 +203,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   
 
   void* pPost = NULL;
-  Serial.printf("\r\nStackpointer before POST is: %p \r\n", (void*)&pPost);
+  Serial.printf("\r\nFree Stack before POST is: %d \r\n", (uint32_t)&pPost - 0x3ffb0050);
 
     httpCode = devHttp->POST((char *)theBody);
  

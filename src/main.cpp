@@ -56,8 +56,12 @@
 
 
 
-uint8_t bufferStore[3500] {0};
-uint8_t * bufferStorePtr = nullptr;
+uint8_t bufferStore[4000] {0};
+uint8_t * bufferStorePtr = &bufferStore[0];
+
+void * StackPtrAtStart;
+void * StackPtrEnd;
+UBaseType_t watermarkStart;
 
 
 
@@ -102,6 +106,19 @@ X509Certificate myX509Certificate = baltimore_root_ca;
     static WiFiClient wifi_client;
   #endif
 
+  // A UDP instance to let us send and receive packets over UDP
+  WiFiUDP ntpUDP;
+  static NTPClient timeClient(ntpUDP);
+  
+  //WiFiHttpClient http;
+  
+  HTTPClient http;
+
+  static HTTPClient * httpPtr = &http;
+  //static WiFiHtttpClient * httpPtr = &http;
+
+ 
+
 
 // Define Datacontainer with SendInterval and InvalidateInterval as defined in config.h
 int sendIntervalSeconds = (SENDINTERVAL_MINUTES * 60) < 1 ? 1 : (SENDINTERVAL_MINUTES * 60);
@@ -127,17 +144,15 @@ int32_t sysTimeNtpDelta = 0;
   const int timeZoneOffset = (int)TIMEZONEOFFSET;
   const int dstOffset = (int)DSTOFFSET;
 
+/*
   // A UDP instance to let us send and receive packets over UDP
   WiFiUDP ntpUDP;
   static NTPClient timeClient(ntpUDP);
-  
   //WiFiHttpClient http;
-  
   HTTPClient http;
-
   static HTTPClient * httpPtr = &http;
   //static WiFiHtttpClient * httpPtr = &http;
-
+*/
   
 
   Rs_TimeNameHelper timeNameHelper;
@@ -151,6 +166,10 @@ static bool UseHttps_State = TRANSPORT_PROTOCOL == 0 ? false : true;
 
 CloudStorageAccount myCloudStorageAccount(AZURE_CONFIG_ACCOUNT_NAME, AZURE_CONFIG_ACCOUNT_KEY, UseHttps_State);
 CloudStorageAccount * myCloudStorageAccountPtr = &myCloudStorageAccount;
+
+ //static TableClient table(myCloudStorageAccountPtr, myX509Certificate,  httpPtr, &wifi_client, bufferStorePtr);
+ //static TableClient table(myCloudStorageAccountPtr, myX509Certificate,  httpPtr, &wifi_client);
+
 
 void GPIOPinISR()
 {
@@ -174,6 +193,13 @@ int getMonNum(const char * month);
 int getWeekOfMonthNum(const char * weekOfMonth);
 
 void setup() {
+
+  //table.Initialize(bufferStorePtr);
+  void* SpStart = NULL;
+  StackPtrAtStart = (void *)&SpStart;
+  watermarkStart =  uxTaskGetStackHighWaterMark(NULL);
+  StackPtrEnd = StackPtrAtStart - watermarkStart;
+
   Serial.begin(115200);
   //while (!Serial);
 
@@ -185,6 +211,13 @@ void setup() {
   
   UBaseType_t watermarkStart_0 = uxTaskGetStackHighWaterMark(taskHandle_0);
   UBaseType_t watermarkStart_1 = uxTaskGetStackHighWaterMark(NULL);
+
+  Serial.printf("\r\n\r\nAddress of Stackpointer near start is:  %p \r\n",  (void *)StackPtrAtStart);
+  Serial.printf("End of Stack is near: %p \r\n",  (void *)StackPtrEnd);
+  Serial.printf("Free Stack near start is:  %d \r\n",  (uint32_t)StackPtrAtStart - (uint32_t)StackPtrEnd);
+  void* SpActual = NULL;
+  Serial.printf("\r\nFree Stack at actual position is: %d \r\n", (uint32_t)&SpActual - (uint32_t)StackPtrEnd);
+  
 
   Serial.print(F("\r\nWatermark for core_0 at start is: "));
   Serial.println(watermarkStart_0);
@@ -216,14 +249,14 @@ void setup() {
   Serial.print(F("Free Heap: "));
   Serial.println(freeHeapSize);
 
-  void* SpStart = NULL;
-  Serial.printf("Stackpointer near start is: %p \r\n", (void*)&SpStart);
+  
 
   
   bufferStore[0] = 0x32;
   bufferStore[1] = 0x33;
   bufferStore[2] = 0x33;
-  bufferStorePtr = &bufferStore[0];
+
+  //bufferStorePtr = &bufferStore[0];
 
   Serial.printf("BufferStore-Base: %09x\r\n", (uint32_t)bufferStorePtr);
 
@@ -1082,7 +1115,8 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
   UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
   Serial.print(F("Watermark for core_1 before creating table (create) is: "));
   Serial.println(watermarkEntityInsert_1);
-
+  
+  // RoSchmi
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
 
   watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
@@ -1156,6 +1190,8 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
   Serial.print(F("Watermark for core_1 at before TableClient is: "));
   Serial.println(watermarkEntityInsert_1);
+  
+  // RoSchmi
 
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
 

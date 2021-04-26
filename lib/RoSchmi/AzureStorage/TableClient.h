@@ -27,6 +27,7 @@
 #define REQUEST_BODY_BUFFER_LENGTH 900
 #define PROPERTIES_BUFFER_LENGTH 300
 #define AUTH_HEADER_BUFFER_LENGTH 100
+#define REQUEST_PREPARE_PTR_BUFFER_LENGTH 500
 
   typedef enum {
     contApplicationIatomIxml,
@@ -58,8 +59,12 @@ public:
     
     
     TableClient(CloudStorageAccount *account, const char * caCert, HTTPClient *httpClient, WiFiClient * wifiClient, uint8_t * bufferStore);
+    //TableClient(CloudStorageAccount *account, const char * caCert, HTTPClient *httpClient, WiFiClient * wifiClient);
+
    
     ~TableClient();
+
+    void Initialize(uint8_t * bufferStorePtr);
     
     az_http_status_code CreateTable(const char * tableName, DateTime pDateTimeUtcNow, ContType pContentType = ContType::contApplicationIatomIxml, AcceptType pAcceptType = AcceptType::acceptApplicationIjson, ResponseType pResponseType = ResponseType::returnContent, bool useSharedKeyLight = false);
     az_http_status_code InsertTableEntity(const char * tableName, DateTime pDateTimeUtcNow, TableEntity pEntity, char* out_ETAG, DateTime * outResonseHeaderDate, ContType pContentType, AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite = false);   

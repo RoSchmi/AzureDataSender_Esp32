@@ -22,7 +22,7 @@
 // The credentials of your WiFi router (not needed for Teensy 4.1) and the name and key of your
 // Azure Storage Account have to be set in the file config_secret.h 
 
-#define SENDINTERVAL_MINUTES   5         // Sendinterval in minutes (10 is recommended), in this interval                                        
+#define SENDINTERVAL_MINUTES   1         // Sendinterval in minutes (10 is recommended), in this interval                                        
                                                    // data are sent to the Cloud (is limited to be not below 1 second)
 
 #define SERIAL_PRINT 1                      // 1 = yes, 0 = no. Select if Serial.print messages are printed 
@@ -86,7 +86,7 @@
 #define  DST_STOP_HOUR               3       // 0 - 23
        
 
-#define TRANSPORT_PROTOCOL 1          // 0 = http, 1 = https
+#define TRANSPORT_PROTOCOL 1         // 0 = http, 1 = https
                                  
 
 #define USE_STATIC_IP 0                // 1 = use static IpAddress, 0 = use DHCP

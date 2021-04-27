@@ -15,6 +15,8 @@
 #include "DateTime.h"
 
 #include "FreeRTOS.h"
+#include "Esp.h"
+#include "esp_task_wdt.h"
 
 #include "CloudStorageAccount.h"
 #include "TableClient.h"
@@ -47,7 +49,7 @@
 
 #include "Rs_TimeNameHelper.h"
 
-#include "Esp.h"
+
 
 // Allocate memory space in memory segment .dram0.bss, ptr to this memory space is later
 // passed to TableClient (is used there as the place for some buffers to preserve stack )
@@ -58,6 +60,8 @@ uint8_t * bufferStorePtr = &bufferStore[0];
 void * StackPtrAtStart;
 void * StackPtrEnd;
 UBaseType_t watermarkStart;
+TaskHandle_t taskHandle_0 =  xTaskGetCurrentTaskHandleForCPU(0);
+TaskHandle_t taskHandle_1 =  xTaskGetCurrentTaskHandleForCPU(1);
 
 #define GPIOPin 0
 bool buttonPressed = false;
@@ -163,6 +167,10 @@ int getMonNum(const char * month);
 int getWeekOfMonthNum(const char * weekOfMonth);
 
 void setup() {
+  
+  // Disable watchdog
+  esp_task_wdt_deinit();  
+   
   // Get Stackptr at start of setup()
   void* SpStart = NULL;
   StackPtrAtStart = (void *)&SpStart;
@@ -171,12 +179,11 @@ void setup() {
   // Calculate (not exact) end-address of the stack
   StackPtrEnd = StackPtrAtStart - watermarkStart;
 
-  uint32_t minFreeHeap = esp_get_minimum_free_heap_size();
+  __unused uint32_t minFreeHeap = esp_get_minimum_free_heap_size();
   uint32_t freeHeapSize = esp_get_free_heap_size();
   
-  /* Get task handles (not needed here)
-  TaskHandle_t taskHandle_0 =  xTaskGetCurrentTaskHandleForCPU(0);
-  TaskHandle_t taskHandle_1 =  xTaskGetCurrentTaskHandleForCPU(1);
+  
+  /*
   UBaseType_t watermarkStart_0 = uxTaskGetStackHighWaterMark(taskHandle_0);
   UBaseType_t watermarkStart_1 = uxTaskGetStackHighWaterMark(NULL);
   */
@@ -219,15 +226,22 @@ void setup() {
   Serial.println(SHIELD_TYPE); 
   Serial.println(WIFI_WEBSERVER_VERSION);
 
-  Serial.printf("BufferStore-Base: %09x\r\n", (uint32_t)bufferStorePtr);
-
-
   // Wait some time (3000 ms)
   uint32_t start = millis();
   while ((millis() - start) < 3000)
   {
     delay(10);
   }
+  
+  #ifdef WORK_WITH_WATCHDOG == 1
+  // Start watchdog with 20 seconds
+  esp_task_wdt_init(20, true);
+  Serial.println(F("Watchdog enabled with interval of 20 sec"));
+  esp_task_wdt_add(NULL);
+
+  //https://www.az-delivery.de/blogs/azdelivery-blog-fur-arduino-und-raspberry-pi/watchdog-und-heartbeat
+  
+  #endif   
 
   onOffDataContainer.begin(DateTime(), OnOffTableName_1, OnOffTableName_2, OnOffTableName_3, OnOffTableName_4);
 
@@ -284,7 +298,7 @@ void setup() {
 
   //Set WiFi to station mode and disconnect from an AP if it was previously connected
   WiFi.mode(WIFI_STA);
-  Serial.println("First disconnecting.");
+  Serial.println(F("First disconnecting, then\r\nConnecting to WiFi-Network"));
 
   while (WiFi.status() != WL_DISCONNECTED)
   {
@@ -319,25 +333,23 @@ if (!WiFi.enableSTA(true))
     delay(1000);
   }
   #endif
+
+#if WORK_WITH_WATCHDOG == 1
+      esp_task_wdt_reset();
+#endif
+
+uint32_t tryConnectCtr = 0;
 while (WiFi.status() != WL_CONNECTED)
   {  
     delay(100);
-    Serial.print("New WiFi-Status: ");
-    Serial.println((int)WiFi.status());
-    //WiFi.begin(ssid, password);
+    Serial.print((tryConnectCtr++ % 20 == 0) ? "\r\n" : "." );  
   }
 
+  Serial.print(F("\r\nGot Ip-Address: "));
   Serial.println(WiFi.localIP());
   
   /*
-  while(true)
-  {
-    Serial.println("Connected");
-    delay(1000);
-  }
-  */
-
-  /*
+  // Alternative way to connect to network, didn't work reliabel
   if(WiFi.status() != WL_CONNECTED){
       scan_WIFI();
       delay(1000);
@@ -350,7 +362,6 @@ while (WiFi.status() != WL_CONNECTED)
       }
 }
 */
-
 
 timeClient.begin();
   timeClient.setUpdateInterval((NTP_UPDATE_INTERVAL_MINUTES < 1 ? 1 : NTP_UPDATE_INTERVAL_MINUTES) * 60 * 1000);
@@ -367,7 +378,7 @@ timeClient.begin();
     Serial.println(F("NTP FAILED: Trying again"));
     delay(1000);
     #if WORK_WITH_WATCHDOG == 1
-      //wdt.feed();
+      esp_task_wdt_reset();
     #endif
     timeClient.update();
   }
@@ -390,7 +401,7 @@ timeClient.begin();
   Serial.println("LOC EPOCH : " + String(timeClient.getEpochTime()));
 
   unsigned long utcTime = timeClient.getUTCEpochTime();  // Seconds since 1. Jan. 1970
-  //dateTimeUTCNow =  utcTime + SECONDS_FROM_1970_TO_2000;
+  
   dateTimeUTCNow =  utcTime;
 
   Serial.printf("%s %i %i %i %i %i", (char *)"UTC-Time is  :", dateTimeUTCNow.year(), 
@@ -417,15 +428,12 @@ void loop()
     digitalWrite(LED_BUILTIN, ledState);    // toggle LED to signal that App is running
 
     #if WORK_WITH_WATCHDOG == 1
-      //wdt.feed();
+      esp_task_wdt_reset();
     #endif
     
-      // Update RTC from Ntp when ntpUpdateInterval has expired, retry when RetryInterval has expired 
-      
+      // Update RTC from Ntp when ntpUpdateInterval has expired, retry when RetryInterval has expired       
       if (timeClient.update())
-      {                                                                  
-        
-        //dateTimeUTCNow = timeClient.getUTCEpochTime() + SECONDS_FROM_1970_TO_2000;
+      {                                                                      
         dateTimeUTCNow = timeClient.getUTCEpochTime();
         
         timeNtpUpdateCounter++;
@@ -437,8 +445,7 @@ void loop()
           Serial.println(buffer);
         #endif
       }  // End NTP stuff
-       
-      //dateTimeUTCNow = timeClient.getUTCEpochTime() + SECONDS_FROM_1970_TO_2000;
+          
       dateTimeUTCNow = timeClient.getUTCEpochTime();
       
       // Get offset in minutes between UTC and local time with consideration of DST
@@ -497,8 +504,6 @@ void loop()
             augmentedAnalogTableName += (dateTimeUTCNow.year());     
           }
           
-          //RoSchmi
-          
           // Create Azure Storage Table if table doesn't exist
           if (localTime.year() != dataContainer.Year)    // if new year
           {  
@@ -551,7 +556,6 @@ void loop()
           insertCounterAnalogTable++;
 
           // RoSchmi, Todo: event. include code to check for memory leaks here
-
 
           // Store Entity to Azure Cloud   
           __unused az_http_status_code insertResult =  insertTableEntity(myCloudStorageAccountPtr, myX509Certificate, (char *)augmentedAnalogTableName.c_str(), analogTableEntity, (char *)EtagBuffer);
@@ -840,7 +844,8 @@ float ReadAnalogSensor(int pSensorIndex)
                 case 0:
                     {
                         float temp_hum_val[2] = {0};
-                        if (!dht.readTempAndHumidity(temp_hum_val))
+                        if (true)
+                        //if (!dht.readTempAndHumidity(temp_hum_val))
                         {
                             analogSensorMgr.SetReadTimeAndValues(pSensorIndex, dateTimeUTCNow, temp_hum_val[1], temp_hum_val[0], MAGIC_NUMBER_INVALID);
                             
@@ -890,7 +895,8 @@ float ReadAnalogSensor(int pSensorIndex)
                         // Alternative                  
                         
                         // Read the light sensor (not used here, collumn is used as upload counter)
-                        theRead = analogRead(WIO_LIGHT);
+                        //theRead = analogRead(WIO_LIGHT);
+                        theRead = 20.0; // dummy
                         theRead = map(theRead, 0, 1023, 0, 100);
                         theRead = theRead < 0 ? 0 : theRead > 100 ? 100 : theRead;
                                                                     
@@ -907,7 +913,7 @@ float ReadAnalogSensor(int pSensorIndex)
 
                     // Read the accelerometer (not used here)
                     // First experiments, don't work well
-                    
+                    /*
                     {
                         ImuSampleValues sampleValues;
                         sampleValues.X_Read = lis.getAccelerationX();
@@ -916,7 +922,10 @@ float ReadAnalogSensor(int pSensorIndex)
                         imuManagerWio.SetNewImuReadings(sampleValues);
 
                         theRead = imuManagerWio.GetVibrationValue();                                                                 
-                    } 
+                    }
+                    */
+                    theRead = 10.0; // dummy
+                     
                     
                     break;
               }
@@ -1066,7 +1075,7 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
   #endif
 
   #if WORK_WITH_WATCHDOG == 1
-      //SAMCrashMonitor::iAmAlive();
+      esp_task_wdt_reset();
   #endif
 
   UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
@@ -1090,7 +1099,7 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
   if ((statusCode == AZ_HTTP_STATUS_CODE_CONFLICT) || (statusCode == AZ_HTTP_STATUS_CODE_CREATED))
   {
     #if WORK_WITH_WATCHDOG == 1
-      //SAMCrashMonitor::iAmAlive();
+      esp_task_wdt_reset();
     #endif
    
       sprintf(codeString, "%s %i", "Table available: ", az_http_status_code(statusCode));  
@@ -1141,7 +1150,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
 
   #if WORK_WITH_WATCHDOG == 1
-      //SAMCrashMonitor::iAmAlive();
+      esp_task_wdt_reset();
   #endif
   
   DateTime responseHeaderDateTime = DateTime();   // Will be filled with DateTime value of the resonse from Azure Service
@@ -1150,7 +1159,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   az_http_status_code statusCode = table.InsertTableEntity(pTableName, dateTimeUTCNow, pTableEntity, (char *)outInsertETag, &responseHeaderDateTime, ContType::contApplicationIatomIxml, AcceptType::acceptApplicationIjson, ResponseType::returnContent, false);
   
   #if WORK_WITH_WATCHDOG == 1
-      //SAMCrashMonitor::iAmAlive();
+      esp_task_wdt_reset();
   #endif
 
   lastResetCause = 0;
@@ -1218,7 +1227,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
     #endif
 
     #if WORK_WITH_WATCHDOG == 1
-      //SAMCrashMonitor::iAmAlive();   
+      esp_task_wdt_reset();  
     #endif
     delay(1000);
   }

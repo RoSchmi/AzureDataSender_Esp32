@@ -3,11 +3,11 @@
 // Heap Memory Allocation
 // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/mem_alloc.html
 
-// Change Stack size which is per default 4096 to 8192
-// user/platformio/packages/framework-arduinoespressif32/tools/sdk/sdkconfig 
+// Change Esp32 Stack size which is per default 8192 to 16384
+// https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994
+// user/platformio/packages/framework-arduinoespressif32/tools/sdk/include/config/sdkconfig.h 
 #include <Arduino.h>
 #include <time.h>
-//#include "platform_time.h"
 #include "WiFiWebServer.h"
 #include "defines.h"
 #include "config.h"
@@ -16,8 +16,6 @@
 
 #include "FreeRTOS.h"
 
-//#include "Time.h"
-//#include "DateTime_Generic.h"
 #include "CloudStorageAccount.h"
 #include "TableClient.h"
 #include "TableEntityProperty.h"
@@ -33,14 +31,11 @@
 #include "WiFiClient.h"
 #include "HTTPClient.h"
 
-
 #include "DataContainerWio.h"
 #include "OnOffDataContainerWio.h"
 #include "OnOffSwitcherWio.h"
 #include "ImuManagerWio.h"
 #include "AnalogSensorMgr.h"
-
-//#include "az_teensy41_roschmi.h"
 
 #include "azure/core/az_platform.h"
 #include "azure/core/az_http.h"
@@ -54,16 +49,15 @@
 
 #include "Esp.h"
 
-
-
+// Allocate memory space in memory segment .dram0.bss, ptr to this memory space is later
+// passed to TableClient (is used there as the place for some buffers to preserve stack )
 uint8_t bufferStore[4000] {0};
 uint8_t * bufferStorePtr = &bufferStore[0];
 
+// Used to keep book of used stack
 void * StackPtrAtStart;
 void * StackPtrEnd;
 UBaseType_t watermarkStart;
-
-
 
 #define GPIOPin 0
 bool buttonPressed = false;
@@ -88,8 +82,6 @@ const bool augmentPartitionKey = true;
 const bool augmentTableNameWithYear = true;
 
 #define LED_BUILTIN 2
-//int Pin16 = 16;
-//int ledPin = 2;
 
 const char *ssid = IOT_CONFIG_WIFI_SSID;
 const char *password = IOT_CONFIG_WIFI_PASSWORD;
@@ -110,16 +102,11 @@ X509Certificate myX509Certificate = baltimore_root_ca;
   WiFiUDP ntpUDP;
   static NTPClient timeClient(ntpUDP);
   
-  //WiFiHttpClient http;
-  
   HTTPClient http;
-
+  
+  // Ptr to HTTPClient
   static HTTPClient * httpPtr = &http;
-  //static WiFiHtttpClient * httpPtr = &http;
-
- 
-
-
+  
 // Define Datacontainer with SendInterval and InvalidateInterval as defined in config.h
 int sendIntervalSeconds = (SENDINTERVAL_MINUTES * 60) < 1 ? 1 : (SENDINTERVAL_MINUTES * 60);
 
@@ -130,12 +117,12 @@ AnalogSensorMgr analogSensorMgr(MAGIC_NUMBER_INVALID);
 OnOffDataContainerWio onOffDataContainer;
 
 OnOffSwitcherWio onOffSwitcherWio;
-
-  
+ 
 uint64_t loopCounter = 0;
 int insertCounterAnalogTable = 0;
 uint32_t tryUploadCounter = 0;
 uint32_t timeNtpUpdateCounter = 0;
+// not used on Esp32
 int32_t sysTimeNtpDelta = 0;
 
   bool ledState = false;
@@ -143,17 +130,6 @@ int32_t sysTimeNtpDelta = 0;
 
   const int timeZoneOffset = (int)TIMEZONEOFFSET;
   const int dstOffset = (int)DSTOFFSET;
-
-/*
-  // A UDP instance to let us send and receive packets over UDP
-  WiFiUDP ntpUDP;
-  static NTPClient timeClient(ntpUDP);
-  //WiFiHttpClient http;
-  HTTPClient http;
-  static HTTPClient * httpPtr = &http;
-  //static WiFiHtttpClient * httpPtr = &http;
-*/
-  
 
   Rs_TimeNameHelper timeNameHelper;
 
@@ -167,14 +143,9 @@ static bool UseHttps_State = TRANSPORT_PROTOCOL == 0 ? false : true;
 CloudStorageAccount myCloudStorageAccount(AZURE_CONFIG_ACCOUNT_NAME, AZURE_CONFIG_ACCOUNT_KEY, UseHttps_State);
 CloudStorageAccount * myCloudStorageAccountPtr = &myCloudStorageAccount;
 
- //static TableClient table(myCloudStorageAccountPtr, myX509Certificate,  httpPtr, &wifi_client, bufferStorePtr);
- //static TableClient table(myCloudStorageAccountPtr, myX509Certificate,  httpPtr, &wifi_client);
-
-
 void GPIOPinISR()
 {
   buttonPressed = true;
-   
 }
 
 // function forward declaration
@@ -184,7 +155,6 @@ String floToStr(float value);
 float ReadAnalogSensor(int pSensorIndex);
 void createSampleTime(DateTime dateTimeUTCNow, int timeZoneOffsetUTC, char * sampleTime);
 az_http_status_code  createTable(CloudStorageAccount * myCloudStorageAccountPtr, X509Certificate pCaCert, const char * tableName);
-//az_http_status_code CreateTable( const char * tableName, DateTime pDateTimeUtcNow, ContType pContentType, AcceptType pAcceptType, ResponseType pResponseType, bool);
 az_http_status_code insertTableEntity(CloudStorageAccount *myCloudStorageAccountPtr,X509Certificate pCaCert, const char * pTableName, TableEntity pTableEntity, char * outInsertETag);
 void makePartitionKey(const char * partitionKeyprefix, bool augmentWithYear, DateTime dateTime, az_span outSpan, size_t *outSpanLength);
 void makeRowKey(DateTime actDate, az_span outSpan, size_t *outSpanLength);
@@ -193,42 +163,49 @@ int getMonNum(const char * month);
 int getWeekOfMonthNum(const char * weekOfMonth);
 
 void setup() {
-
-  //table.Initialize(bufferStorePtr);
+  // Get Stackptr at start of setup()
   void* SpStart = NULL;
   StackPtrAtStart = (void *)&SpStart;
+  // Get StackHighWatermark at start of setup()
   watermarkStart =  uxTaskGetStackHighWaterMark(NULL);
+  // Calculate (not exact) end-address of the stack
   StackPtrEnd = StackPtrAtStart - watermarkStart;
+
+  uint32_t minFreeHeap = esp_get_minimum_free_heap_size();
+  uint32_t freeHeapSize = esp_get_free_heap_size();
+  
+  /* Get task handles (not needed here)
+  TaskHandle_t taskHandle_0 =  xTaskGetCurrentTaskHandleForCPU(0);
+  TaskHandle_t taskHandle_1 =  xTaskGetCurrentTaskHandleForCPU(1);
+  UBaseType_t watermarkStart_0 = uxTaskGetStackHighWaterMark(taskHandle_0);
+  UBaseType_t watermarkStart_1 = uxTaskGetStackHighWaterMark(NULL);
+  */
+  
+
+
 
   Serial.begin(115200);
   //while (!Serial);
 
   attachInterrupt(GPIOPin, GPIOPinISR, RISING);
   
-  TaskHandle_t taskHandle_0 =  xTaskGetCurrentTaskHandleForCPU(0);
-  TaskHandle_t taskHandle_1 =  xTaskGetCurrentTaskHandleForCPU(1);
-  
-  
-  UBaseType_t watermarkStart_0 = uxTaskGetStackHighWaterMark(taskHandle_0);
-  UBaseType_t watermarkStart_1 = uxTaskGetStackHighWaterMark(NULL);
-
   Serial.printf("\r\n\r\nAddress of Stackpointer near start is:  %p \r\n",  (void *)StackPtrAtStart);
-  Serial.printf("End of Stack is near: %p \r\n",  (void *)StackPtrEnd);
+  Serial.printf("End of Stack is near:               %p \r\n",  (void *)StackPtrEnd);
   Serial.printf("Free Stack near start is:  %d \r\n",  (uint32_t)StackPtrAtStart - (uint32_t)StackPtrEnd);
+
+  /*
+  // Get free stack at actual position (can be used somewhere in program)
   void* SpActual = NULL;
   Serial.printf("\r\nFree Stack at actual position is: %d \r\n", (uint32_t)&SpActual - (uint32_t)StackPtrEnd);
-  
+  */
 
-  Serial.print(F("\r\nWatermark for core_0 at start is: "));
-  Serial.println(watermarkStart_0);
-  Serial.print(F("Watermark for core_1 at start is: "));
-  Serial.println(watermarkStart_1);
-
+  Serial.print(F("Free Heap: "));
+  Serial.println(freeHeapSize);
 
   delay(2000);
   Serial.println(F("\r\n\r\nPress Boot Button to continue!"));
 
-  // Wait on press and release of boot button
+  // Wait on press/release of boot button
   while (!buttonPressed)
   {
     delay(100);
@@ -236,35 +213,15 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
 
-  
-  
   Serial.print(F("\nStarting ConnectWPA on "));
   Serial.print(BOARD_NAME);
   Serial.print(F(" with "));
   Serial.println(SHIELD_TYPE); 
   Serial.println(WIFI_WEBSERVER_VERSION);
 
-  uint32_t minFreeHeap = esp_get_minimum_free_heap_size();
-  uint32_t freeHeapSize = esp_get_free_heap_size();
-  Serial.print(F("Free Heap: "));
-  Serial.println(freeHeapSize);
-
-  
-
-  
-  bufferStore[0] = 0x32;
-  bufferStore[1] = 0x33;
-  bufferStore[2] = 0x33;
-
-  //bufferStorePtr = &bufferStore[0];
-
   Serial.printf("BufferStore-Base: %09x\r\n", (uint32_t)bufferStorePtr);
 
-  volatile uint8_t * bufferStorePtrCopy = bufferStorePtr;
 
-
-
-  
   // Wait some time (3000 ms)
   uint32_t start = millis();
   while ((millis() - start) < 3000)
@@ -1124,7 +1081,7 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
   Serial.println(watermarkEntityInsert_1);
 
   // Create Table
-  az_http_status_code statusCode = table.CreateTable(pTableName, dateTimeUTCNow, contApplicationIatomIxml, acceptApplicationIjson, returnContent, false);
+  az_http_status_code statusCode = table.CreateTable(pTableName, dateTimeUTCNow, ContType::contApplicationIatomIxml, AcceptType::acceptApplicationIjson, returnContent, false);
   
    // RoSchmi for tests: to simulate failed upload
    //az_http_status_code   statusCode = AZ_HTTP_STATUS_CODE_UNAUTHORIZED;
@@ -1159,23 +1116,16 @@ return statusCode;
 
 az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Certificate pCaCert, const char * pTableName, TableEntity pTableEntity, char * outInsertETag)
 { 
-  UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 at start of insertTableEntity is: "));
-  Serial.println(watermarkEntityInsert_1);
-
   #if TRANSPORT_PROTOCOL == 1
     static WiFiClientSecure wifi_client;
   #else
     static WiFiClient wifi_client;
   #endif
   
-  
   #if TRANSPORT_PROTOCOL == 1
-    wifi_client.setCACert(myX509Certificate);
-    //wifi_client.setCACert(baltimore_corrupt_root_ca);
+    wifi_client.setCACert(myX509Certificate); 
   #endif
   
-
   /*
   // For tests: Try second upload with corrupted certificate to provoke failure
   #if TRANSPORT_PROTOCOL == 1
@@ -1187,19 +1137,9 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   #endif
   */
 
-  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 at before TableClient is: "));
-  Serial.println(watermarkEntityInsert_1);
-  
   // RoSchmi
-
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
 
-  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 before TableClient is: "));
-  Serial.println(watermarkEntityInsert_1);
-
-  
   #if WORK_WITH_WATCHDOG == 1
       //SAMCrashMonitor::iAmAlive();
   #endif
@@ -1207,7 +1147,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   DateTime responseHeaderDateTime = DateTime();   // Will be filled with DateTime value of the resonse from Azure Service
 
   // Insert Entity
-  az_http_status_code statusCode = table.InsertTableEntity(pTableName, dateTimeUTCNow, pTableEntity, (char *)outInsertETag, &responseHeaderDateTime, contApplicationIatomIxml, acceptApplicationIjson, dont_returnContent, false);
+  az_http_status_code statusCode = table.InsertTableEntity(pTableName, dateTimeUTCNow, pTableEntity, (char *)outInsertETag, &responseHeaderDateTime, ContType::contApplicationIatomIxml, AcceptType::acceptApplicationIjson, ResponseType::returnContent, false);
   
   #if WORK_WITH_WATCHDOG == 1
       //SAMCrashMonitor::iAmAlive();
@@ -1282,9 +1222,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
     #endif
     delay(1000);
   }
-  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 after first Entity Insert is: "));
-  Serial.println(watermarkEntityInsert_1);
+  
   return statusCode;
 }
 

@@ -17,7 +17,7 @@
 #include "RoSchmi_encryption_helpers.h"
 
 #include "roschmi_az_storage_tables.h"
-#include "az_wioterminal_roschmi.h"
+#include "az_esp32_roschmi.h"
 
 #ifndef _TABLECLIENT_H_
 #define _TABLECLIENT_H_

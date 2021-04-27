@@ -12,8 +12,8 @@
 
 #include "HTTPClient.h"
 
-#ifndef _AZ_WIO_TERMINAL_ROSCHMI_H_
-#define _AZ_WIO_TERMINAL_ROSCHMI_H_
+#ifndef _AZ_ESP32_ROSCHMI_H_
+#define _AZ_ESP32_ROSCHMI_H_
 
 #define MAX_HEADERNAME_LENGTH 30
 #define MAX_HEADERVALUE_LENGTH 120
@@ -39,4 +39,4 @@ az_span header_name,
 az_span header_value,
 az_span separator);
     
-#endif
+#endif  // _AZ_ESP32_ROSCHMI_H_

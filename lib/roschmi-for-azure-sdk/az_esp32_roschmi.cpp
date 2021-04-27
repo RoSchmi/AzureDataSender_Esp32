@@ -5,7 +5,7 @@
 // Copyright (c) RoSchmi. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-// The code of this file provides Wio Terminal specific solutions for the 'generic' function calls from
+// The code of this file provides Esp32 specific solutions for the 'generic' function calls from
 // the azure-sdk-for-c
 
 // These functions are:
@@ -14,7 +14,7 @@
 //    az_platform_sleep_msec(...)
 
 
-#include <az_wioterminal_roschmi.h>
+#include <az_esp32_roschmi.h>
 
 
 HTTPClient *  devHttp = NULL;
@@ -50,13 +50,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   _az_PRECONDITION_NOT_NULL(request);
   _az_PRECONDITION_NOT_NULL(ref_response);
 
-  void* SpTableClient_5 = NULL;
-  volatile uint32_t RestStack = (uint32_t)&SpTableClient_5 - (uint32_t)0x3ffb0050;
-
    Serial.println(F("az_http_client_send_request"));
-
- 
-    
 
   // Working with spans
   //https://github.com/Azure/azure-sdk-for-c/tree/master/sdk/docs/core#working-with-spans
@@ -125,13 +119,10 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   
   if (port == 80)      // http ?
   { 
-    Serial.println("Port = 80");
-   
+    
       devHttp->begin(* devWifiClient, host, port, resource, false);
-      //devHttp->begin(* devWifiClient, (const char *)workBuffer, port, slashIndex != -1 ? (const char *)workBuffer : "", false);
       
-       
-       Serial.println("first after begin");
+       //Serial.println("first after begin");
        
   }
   else                 // https
@@ -196,14 +187,13 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
       
     int httpCode = -1;
 
-  
+  /*  Give information about stack size
   UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
   Serial.print(F("Watermark for core_1 before POST is: "));
   Serial.println(watermarkEntityInsert_1);
-  
-
   void* pPost = NULL;
   Serial.printf("\r\nFree Stack before POST is: %d \r\n", (uint32_t)&pPost - 0x3ffb0050);
+  */
 
     httpCode = devHttp->POST((char *)theBody);
  

@@ -429,29 +429,9 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
       volatile int dummy643 = 1;    
   }
   
-  /*
-  // To save memory set buffer address to 0x2002A000
-   uint8_t * responseBufferAddr = (uint8_t *)RESPONSE_BUFFER_MEMORY_ADDR;
-  az_span response_az_span = az_span_create(responseBufferAddr, RESPONSE_BUFFER_LENGTH);
-  */
-  
-  /*
-   uint8_t responseBuffer[RESPONSE_BUFFER_LENGTH] {0};
-  az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
-  */
-
-  Serial.printf("Response Buffer starts at: %09x \r\n", (uint32_t)_responsePtr);
+  //Serial.printf("Response Buffer starts at: %09x \r\n", (uint32_t)_responsePtr);
 
   az_span response_az_span = az_span_create(_responsePtr, RESPONSE_BUFFER_LENGTH);
-  //az_span response_az_span = AZ_SPAN_FROM_BUFFER(responseBuffer);
-
-  /*
-  az_http_response http_response;
-  if (az_http_response_init(&http_response, response_az_span) != AZ_OK)
-  {
-    //volatile int dummy645 = 1; 
-  }
-  */
   
   az_http_response http_response;
   if (az_result_failed(az_http_response_init(&http_response, response_az_span)))
@@ -469,9 +449,6 @@ AcceptType pAcceptType, ResponseType pResponseType, bool useSharedKeyLite)
   setHttpClient(_httpPtr);
   setCaCert(_caCert);
   setWiFiClient(_wifiClient);
-
-  //__unused az_result const entity_upload_result = 
-  //  az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)authorizationHeaderBuffer), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
 
     __unused az_result const entity_upload_result = 
     az_storage_tables_upload(&tabClient, content_to_upload, az_span_create_from_str(md5Buffer), az_span_create_from_str((char *)_authorizationHeaderBufferPtr), az_span_create_from_str((char *)x_ms_timestamp), &uploadOptions, &http_response);
@@ -553,7 +530,7 @@ DateTime GetDateTimeFromDateHeader(az_span x_ms_time)
   }
 
   parseError = theYear < 2000 ? true : theYear > 9999 ? true : parseError;
-  //parseError = theMonth < 0 ? true : theMonth > 11 ? true : parseError;
+  parseError = theMonth < 0 ? true : theMonth > 11 ? true : parseError;
   parseError = theDay < 1 ? true : theDay > 31 ? true : parseError;
   parseError = theHour < 0 ? true : theHour > 23 ? true : parseError;
   parseError = theMinute < 0 ? true : theMinute > 59 ? true : parseError;

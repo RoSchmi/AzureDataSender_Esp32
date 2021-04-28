@@ -70,7 +70,7 @@ typedef struct
  */
 AZ_NODISCARD AZ_INLINE _az_http_policy_telemetry_options _az_http_policy_telemetry_options_default()
 {
-  return (_az_http_policy_telemetry_options){ .os = AZ_SPAN_FROM_STR("RS_Teensy41") };
+  return (_az_http_policy_telemetry_options){ .os = AZ_SPAN_FROM_STR("RS_Esp32") };
 }
 
 // RoSchmi

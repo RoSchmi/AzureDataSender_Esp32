@@ -1,11 +1,36 @@
+// Application AzureDataSender_Esp32
+// Copyright RoSchmi 2021. License Apache 2.0
+
+// Cave !!!!!!!
+// The default Esp32 stack is too small to run this program with TLS secured requests, so the following patch is needed
+
+// Change Esp32 Stack size which is per default 8192 to 16384 (ersae and recompile the .pio build folder)
+// https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994
+// user/platformio/packages/framework-arduinoespressif32/tools/sdk/include/config/sdkconfig.h
+
+// Set WiFi and Azure credentials in file include/config_secret.h  (take config_secret_template.h as template)
+// Settings like sendinterval, timezone, daylightsavingstime settings, transport protocol, 
+// tablenames and so on are to be defined in /include/config.h
+
+
+  // I started to make this App from the Azure Storage Blob Example see: 
+  // https://github.com/Azure/azure-sdk-for-c/blob/5c7444dfcd5f0b3bcf3aec2f7b62639afc8bd664/sdk/samples/storage/blobs/src/blobs_client_example.c
+
+  // The used Azure-sdk-for-c libraries were Vers. 1.1.0
+  // https://github.com/Azure/azure-sdk-for-c/releases/tag/1.1.0
+  // In Vers. 1.1.0 were some changes needed in the file az_http_internal.h
+  // the changes are included in this repo
+  
 
 // ESP_IDF Programming Guide
 // Heap Memory Allocation
 // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/mem_alloc.html
 
-// Change Esp32 Stack size which is per default 8192 to 16384
-// https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994
-// user/platformio/packages/framework-arduinoespressif32/tools/sdk/include/config/sdkconfig.h 
+
+// In config.h you can select that simulated sensor values are used. Comment the line
+// #define USE_SIMULATED_SENSORVALUES  in config.h if not wanted   
+
+
 #include <Arduino.h>
 #include <time.h>
 #include "WiFiWebServer.h"
@@ -17,6 +42,8 @@
 #include "FreeRTOS.h"
 #include "Esp.h"
 #include "esp_task_wdt.h"
+#include <rom/rtc.h>
+
 
 #include "CloudStorageAccount.h"
 #include "TableClient.h"
@@ -62,6 +89,14 @@ void * StackPtrEnd;
 UBaseType_t watermarkStart;
 TaskHandle_t taskHandle_0 =  xTaskGetCurrentTaskHandleForCPU(0);
 TaskHandle_t taskHandle_1 =  xTaskGetCurrentTaskHandleForCPU(1);
+
+bool watchDogEnabled = false;
+bool watchDogCommandSuccessful = false;
+
+RESET_REASON resetReason_0;
+RESET_REASON resetReason_1;
+
+uint8_t lastResetCause = 0;
 
 #define GPIOPin 0
 bool buttonPressed = false;
@@ -130,7 +165,7 @@ uint32_t timeNtpUpdateCounter = 0;
 int32_t sysTimeNtpDelta = 0;
 
   bool ledState = false;
-  uint8_t lastResetCause = -1;
+  
 
   const int timeZoneOffset = (int)TIMEZONEOFFSET;
   const int dstOffset = (int)DSTOFFSET;
@@ -167,10 +202,7 @@ int getMonNum(const char * month);
 int getWeekOfMonthNum(const char * weekOfMonth);
 
 void setup() {
-  
-  // Disable watchdog
-  esp_task_wdt_deinit();  
-   
+
   // Get Stackptr at start of setup()
   void* SpStart = NULL;
   StackPtrAtStart = (void *)&SpStart;
@@ -187,17 +219,31 @@ void setup() {
   UBaseType_t watermarkStart_0 = uxTaskGetStackHighWaterMark(taskHandle_0);
   UBaseType_t watermarkStart_1 = uxTaskGetStackHighWaterMark(NULL);
   */
+
+  resetReason_0 = rtc_get_reset_reason(0);
+  resetReason_1 = rtc_get_reset_reason(1);
+  lastResetCause = resetReason_1;  
+
   
+  // Disable watchdog
 
-
-
+  if (esp_task_wdt_deinit() == ESP_OK)
+  {
+      watchDogEnabled = false;
+      watchDogCommandSuccessful = true;
+  }
+  else
+  {
+    watchDogCommandSuccessful = false;
+  }
+  
   Serial.begin(115200);
   //while (!Serial);
 
   attachInterrupt(GPIOPin, GPIOPinISR, RISING);
   
   Serial.printf("\r\n\r\nAddress of Stackpointer near start is:  %p \r\n",  (void *)StackPtrAtStart);
-  Serial.printf("End of Stack is near:               %p \r\n",  (void *)StackPtrEnd);
+  Serial.printf("End of Stack is near:                   %p \r\n",  (void *)StackPtrEnd);
   Serial.printf("Free Stack near start is:  %d \r\n",  (uint32_t)StackPtrAtStart - (uint32_t)StackPtrEnd);
 
   /*
@@ -208,15 +254,23 @@ void setup() {
 
   Serial.print(F("Free Heap: "));
   Serial.println(freeHeapSize);
+  Serial.printf("Last Reset Reason: CPU_0 = %u, CPU_1 = %u", resetReason_0, resetReason_1);
+
+  if(watchDogCommandSuccessful)
+  {
+    Serial.println(F("Watchdog disabled"));
+  }
 
   delay(2000);
   Serial.println(F("\r\n\r\nPress Boot Button to continue!"));
 
-  // Wait on press/release of boot button
+  // If wanted -> Wait on press/release of boot button
+  /*
   while (!buttonPressed)
   {
     delay(100);
   }
+  */
 
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -233,14 +287,22 @@ void setup() {
     delay(10);
   }
   
-  #ifdef WORK_WITH_WATCHDOG == 1
-  // Start watchdog with 20 seconds
-  esp_task_wdt_init(20, true);
-  Serial.println(F("Watchdog enabled with interval of 20 sec"));
-  esp_task_wdt_add(NULL);
 
-  //https://www.az-delivery.de/blogs/azdelivery-blog-fur-arduino-und-raspberry-pi/watchdog-und-heartbeat
-  
+  #if WORK_WITH_WATCHDOG == 1
+    // Start watchdog with 20 seconds
+    if (esp_task_wdt_init(20, true) == ESP_OK)
+    {
+      Serial.println(F("Watchdog enabled with interval of 20 sec"));
+    }
+    else
+    {
+      Serial.println(F("Failed to enable watchdog"));
+    }
+    esp_task_wdt_add(NULL);
+
+    //https://www.az-delivery.de/blogs/azdelivery-blog-fur-arduino-und-raspberry-pi/watchdog-und-heartbeat
+
+    //https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/wdts.html
   #endif   
 
   onOffDataContainer.begin(DateTime(), OnOffTableName_1, OnOffTableName_2, OnOffTableName_3, OnOffTableName_4);
@@ -342,7 +404,7 @@ uint32_t tryConnectCtr = 0;
 while (WiFi.status() != WL_CONNECTED)
   {  
     delay(100);
-    Serial.print((tryConnectCtr++ % 20 == 0) ? "\r\n" : "." );  
+    Serial.print((tryConnectCtr++ % 40 == 0) ? "\r\n" : "." );  
   }
 
   Serial.print(F("\r\nGot Ip-Address: "));
@@ -415,6 +477,8 @@ timeClient.begin();
                                         localTime.month() , localTime.day(),
                                         localTime.hour() , localTime.minute());
   Serial.println("");
+
+ 
 
 }
 
@@ -548,8 +612,7 @@ void loop()
           AnalogTableEntity analogTableEntity(partitionKey, rowKey, az_span_create_from_str((char *)sampleTime),  AnalogPropertiesArray, analogPropertyCount);
           
           #if SERIAL_PRINT == 1
-          sprintf(strData, "   Trying to insert %u", insertCounterAnalogTable);
-          Serial.println(strData);
+            Serial.printf("Trying to insert %u \r\n", insertCounterAnalogTable);
           #endif  
              
           // Keep track of tries to insert and check for memory leak
@@ -993,8 +1056,8 @@ float ReadAnalogSensor(int pSensorIndex)
               case 3:
               {
 
-                return (double)9.9;   // just something for now
-                //return lastResetCause;
+                //return (double)9.9;   // just something for now
+                return lastResetCause;
               }
               break;
             
@@ -1078,16 +1141,8 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
       esp_task_wdt_reset();
   #endif
 
-  UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 before creating table (create) is: "));
-  Serial.println(watermarkEntityInsert_1);
-  
-  // RoSchmi
+ 
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
-
-  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 after creating table (create) is: "));
-  Serial.println(watermarkEntityInsert_1);
 
   // Create Table
   az_http_status_code statusCode = table.CreateTable(pTableName, dateTimeUTCNow, ContType::contApplicationIatomIxml, AcceptType::acceptApplicationIjson, returnContent, false);
@@ -1102,23 +1157,25 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
       esp_task_wdt_reset();
     #endif
    
-      sprintf(codeString, "%s %i", "Table available: ", az_http_status_code(statusCode));  
-      Serial.println((char *)codeString);
+      sprintf(codeString, "%s %i", "Table available: ", az_http_status_code(statusCode));
+      #if SERIAL_PRINT == 1
+        Serial.println((char *)codeString);
+      #endif
   
   }
   else
   {
     
     
-      sprintf(codeString, "%s %i", "Table Creation failed: ", az_http_status_code(statusCode));   
-      Serial.println((char *)codeString);
+      sprintf(codeString, "%s %i", "Table Creation failed: ", az_http_status_code(statusCode));
+      #if SERIAL_PRINT == 1   
+        Serial.println((char *)codeString);
+      #endif
  
     delay(1000);
     //NVIC_SystemReset();     // Makes Code 64  
   }
-  UBaseType_t watermarkTableCreate_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 after first Table Create is: "));
-  Serial.println(watermarkTableCreate_1);
+  
 
 return statusCode;
 }
@@ -1156,7 +1213,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   DateTime responseHeaderDateTime = DateTime();   // Will be filled with DateTime value of the resonse from Azure Service
 
   // Insert Entity
-  az_http_status_code statusCode = table.InsertTableEntity(pTableName, dateTimeUTCNow, pTableEntity, (char *)outInsertETag, &responseHeaderDateTime, ContType::contApplicationIatomIxml, AcceptType::acceptApplicationIjson, ResponseType::returnContent, false);
+  az_http_status_code statusCode = table.InsertTableEntity(pTableName, dateTimeUTCNow, pTableEntity, (char *)outInsertETag, &responseHeaderDateTime, ContType::contApplicationIatomIxml, AcceptType::acceptApplicationIjson, ResponseType::dont_returnContent, false);
   
   #if WORK_WITH_WATCHDOG == 1
       esp_task_wdt_reset();
@@ -1174,7 +1231,9 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
      
       char codeString[35] {0};
       sprintf(codeString, "%s %i", "Entity inserted: ", az_http_status_code(statusCode));
-      Serial.println((char *)codeString);
+      #if SERIAL_PRINT == 1
+        Serial.println((char *)codeString);
+      #endif
     
     
     
@@ -1184,9 +1243,10 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
     
     char buffer[] = "Azure-Utc: YYYY-MM-DD hh:mm:ss";
     dateTimeUTCNow.toString(buffer);
-
-    
-    Serial.println((char *)buffer);
+    #if SERIAL_PRINT == 1
+      Serial.println((char *)buffer);
+      Serial.println("");
+    #endif
     
     #endif   
   }
@@ -1201,26 +1261,20 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
     
       char codeString[35] {0};
       sprintf(codeString, "%s %i", "Insertion failed: ", az_http_status_code(statusCode));
-      Serial.println((char *)codeString);
+      #if SERIAL_PRINT == 1
+        Serial.println((char *)codeString);
+      #endif
   
     
     #if REBOOT_AFTER_FAILED_UPLOAD == 1   // When selected in config.h -> Reboot through SystemReset after failed uoload
 
-        #if TRANSPORT_PROTOCOL == 1
-          
-          // The outcommended code resets the WiFi module (did not solve problem)
-          //pinMode(RTL8720D_CHIP_PU, OUTPUT); 
-          //digitalWrite(RTL8720D_CHIP_PU, LOW); 
-          //delay(500); 
-          //digitalWrite(RTL8720D_CHIP_PU, HIGH);  
-          //delay(500);
-
-          NVIC_SystemReset();     // Makes Code 64
+        #if TRANSPORT_PROTOCOL == 1         
+          ESP.restart();        
         #endif
         #if TRANSPORT_PROTOCOL == 0     // for http requests reboot after the second, not the first, failed request
           if(failedUploadCounter > 1)
           {
-            NVIC_SystemReset();     // Makes Code 64
+            ESP.restart();
           }
     #endif
 

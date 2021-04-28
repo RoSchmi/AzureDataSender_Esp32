@@ -15,6 +15,7 @@
 
 
 #include <az_esp32_roschmi.h>
+#include "config.h"
 
 
 HTTPClient *  devHttp = NULL;
@@ -50,7 +51,7 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   _az_PRECONDITION_NOT_NULL(request);
   _az_PRECONDITION_NOT_NULL(ref_response);
 
-   Serial.println(F("az_http_client_send_request"));
+   //Serial.println(F("az_http_client_send_request"));
 
   // Working with spans
   //https://github.com/Azure/azure-sdk-for-c/tree/master/sdk/docs/core#working-with-spans
@@ -114,21 +115,18 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   String resource = slashIndex != -1 ? (char *)workBuffer : "";
   
   uint16_t port = (strcmp(protocol, (char *)"http") == 0) ? 80 : 443;
+  
 
   devHttp->setReuse(false);
+
   
   if (port == 80)      // http ?
   { 
-    
-      devHttp->begin(* devWifiClient, host, port, resource, false);
-      
-       //Serial.println("first after begin");
-       
+      devHttp->begin(* devWifiClient, host, port, resource, false);    
   }
   else                 // https
   {
     devHttp->begin(* devWifiClient, host, port, resource, true);
-    //devHttp->begin(* devWifiClient, (const char *)workBuffer, port, slashIndex != -1 ? (const char *)workBuffer : "", true);    
   }
     
   char name_buffer[MAX_HEADERNAME_LENGTH +2] {0};
@@ -141,76 +139,56 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
   String nameString = (char *)strInit;
   String valueString = (char *)strInit;
 
+  // transfere header to HTTPClient
   for (int32_t offset = (headerCount - 1); offset >= 0; offset--)
   {
-      Serial.println(F("Am in loop"));
-      Serial.println(offset);
+    _az_RETURN_IF_FAILED(az_http_request_get_header(request, offset, &head_name, &head_value));
+
+      // For debugging, print header
+      /*
+      // Serial.println(offset);
       char buf[50] {0};
       az_span_to_str(buf, 49, head_name);
       Serial.printf((char *) buf);
+      Serial.print(" : ");
       az_span_to_str(buf, 49, head_value);
       Serial.println((char *)buf);
-      /*
-      while (true)
-   {
-     Serial.println("Halted in Loop");
-     delay(5000);
-   }
-    */
-  
-    _az_RETURN_IF_FAILED(az_http_request_get_header(request, offset, &head_name, &head_value));
-       Serial.println(F("Get first header"));
+      */
    
     az_span_to_str((char *)name_buffer, MAX_HEADERNAME_LENGTH -1, head_name);
     az_span_to_str((char *)value_buffer, MAX_HEADERVALUE_LENGTH -1, head_value);
     nameString = (char *)name_buffer;
     valueString = (char *)value_buffer;
 
-    devHttp->addHeader(nameString, valueString, true, true);
-    
+    devHttp->addHeader(nameString, valueString, true, true);    
   }
-
-
-  Serial.println(F("After adding headers "));
-  
-
-  // int32_t bodySize = request->_internal.body._internal.size;
 
   uint8_t * theBody = request->_internal.body._internal.ptr;
 
   if (az_span_is_content_equal(requMethod, AZ_SPAN_LITERAL_FROM_STR("POST")))
-  {  
-    Serial.println(F("In POST routine"));
-      
+  {      
     const char * headerKeys[] = {"ETag", "Date", "x-ms-request-id", "x-ms-version", "Content-Type"};       
     devHttp->collectHeaders(headerKeys, 5);
       
     int httpCode = -1;
 
-  /*  Give information about stack size
-  UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
-  Serial.print(F("Watermark for core_1 before POST is: "));
-  Serial.println(watermarkEntityInsert_1);
-  void* pPost = NULL;
-  Serial.printf("\r\nFree Stack before POST is: %d \r\n", (uint32_t)&pPost - 0x3ffb0050);
-  */
+    /*  Give information about stack size
+    UBaseType_t  watermarkEntityInsert_1 = uxTaskGetStackHighWaterMark(NULL);
+    Serial.print(F("Watermark for core_1 before POST is: "));
+    Serial.println(watermarkEntityInsert_1);
+    */
 
+    //void* pPost = NULL;
+    //Serial.printf("\r\nFree Stack before POST is: %d \r\n", (uint32_t)&pPost - 0x3ffb0050);
+  
     httpCode = devHttp->POST((char *)theBody);
  
     delay(1);
-    /*
-     while (true)
-   {
-     Serial.println("Halted in Loop after post");
-     delay(5000);
-   }   
-   */    
-    //volatile size_t responseBodySize = devHttp->getSize();
-              
+             
     int indexCtr = 0;
     int pageWidth = 50;
         
-    //delay(2000);
+    
         
     az_result appendResult;
     char httpStatusLine[40] {0};
@@ -218,8 +196,9 @@ az_http_client_send_request(az_http_request const* request, az_http_response* re
     {      
           sprintf((char *)httpStatusLine, "%s%i%s", "HTTP/1.1 ", httpCode, " ***\r\n");
 
-          // RoSchmi
+          #if SERIAL_PRINT == 1
           Serial.println(httpStatusLine);
+          #endif
 
           appendResult = az_http_response_append(ref_response, az_span_create_from_str((char *)httpStatusLine));
 

@@ -160,6 +160,7 @@ OnOffSwitcherWio onOffSwitcherWio;
 uint64_t loopCounter = 0;
 int insertCounterAnalogTable = 0;
 uint32_t tryUploadCounter = 0;
+uint32_t failedUploadCounter = 0;
 uint32_t timeNtpUpdateCounter = 0;
 // not used on Esp32
 int32_t sysTimeNtpDelta = 0;
@@ -1141,7 +1142,6 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
       esp_task_wdt_reset();
   #endif
 
- 
   TableClient table(pAccountPtr, pCaCert,  httpPtr, &wifi_client, bufferStorePtr);
 
   // Create Table
@@ -1173,7 +1173,8 @@ az_http_status_code createTable(CloudStorageAccount *pAccountPtr, X509Certificat
       #endif
  
     delay(1000);
-    //NVIC_SystemReset();     // Makes Code 64  
+    ESP.restart();
+    
   }
   
 
@@ -1227,15 +1228,11 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   
   if ((statusCode == AZ_HTTP_STATUS_CODE_NO_CONTENT) || (statusCode == AZ_HTTP_STATUS_CODE_CREATED))
   {
-    //sendResultState = true;
-     
       char codeString[35] {0};
       sprintf(codeString, "%s %i", "Entity inserted: ", az_http_status_code(statusCode));
       #if SERIAL_PRINT == 1
         Serial.println((char *)codeString);
       #endif
-    
-    
     
     #if UPDATE_TIME_FROM_AZURE_RESPONSE == 1    // System time shall be updated from the DateTime value of the response ?
     
@@ -1254,7 +1251,7 @@ az_http_status_code insertTableEntity(CloudStorageAccount *pAccountPtr,  X509Cer
   {               // note: internal error codes from -1 to -11 were converted for tests to error codes 401 to 411 since
                   // negative values cannot be returned as 'az_http_status_code' 
 
-    //failedUploadCounter++;
+    failedUploadCounter++;
     //sendResultState = false;
     lastResetCause = 100;      // Set lastResetCause to arbitrary value of 100 to signal that post request failed
     

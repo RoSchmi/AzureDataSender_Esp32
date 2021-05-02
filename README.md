@@ -12,7 +12,6 @@ To work with TLS the default stack size 8182 of the Esp32 had to be enlarged (e.
 
 -https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994
 
-On your PC edit the file C:\Users\<user>\.platformio\packages\framework-arduinoespressif32\tools\sdk\include\config\sdkconfig.h
 
 On your PC replace the file C:\Users\<user>\.platformio\packages\framework-arduinoespressif32\cores\esp32\main.cpp
 with the file 'main.cpp' from folder 'patches' of this repository, then use the following code to configure stack size
@@ -22,4 +21,4 @@ with the file 'main.cpp' from folder 'patches' of this repository, then use the 
     #endif
 
 
-Use the iPhone- or Android- App 'Charts4Azure' to visualize the uploaded Sensor data
+Use the iPhone- or Android- App 'Charts4Azure' (https://azureiotcharts.home.blog/)  to visualize the uploaded Sensor data

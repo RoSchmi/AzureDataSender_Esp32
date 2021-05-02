@@ -8,15 +8,18 @@ https://www.hackster.io/RoSchmi/wio-terminal-app-sending-sensor-data-to-azure-st
 
 Patches for Esp32 board:
 
-To work with TLS the Stack size of of the Esp32 had to be enlarged
+To work with TLS the default stack size 8182 of the Esp32 had to be enlarged (e.g. to 16384)
 
 -https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994
 
 On your PC edit the file C:\Users\<user>\.platformio\packages\framework-arduinoespressif32\tools\sdk\include\config\sdkconfig.h
 
-Change:
+On your PC replace the file C:\Users\<user>\.platformio\packages\framework-arduinoespressif32\cores\esp32\main.cpp
+with the file 'main.cpp' from folder 'patches' of this repository, then use the following code to configure stack size
 
-#define CONFIG_ARDUINO_LOOP_STACK_SIZE 8192   to #define CONFIG_ARDUINO_LOOP_STACK_SIZE 16384
+    #if !(USING_DEFAULT_ARDUINO_LOOP_STACK_SIZE)
+        uint16_t USER_CONFIG_ARDUINO_LOOP_STACK_SIZE = 16384;
+    #endif
 
-in your project delete the .pio build folder and recompile the application
 
+Use the iPhone- or Android- App 'Charts4Azure' to visualize the uploaded Sensor data

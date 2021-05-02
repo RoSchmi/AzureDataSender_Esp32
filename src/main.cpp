@@ -3,10 +3,11 @@
 
 // Cave !!!!!!!
 // The default Esp32 stack is too small to run this program with TLS secured requests, so the following patch is needed
-
-// Change Esp32 Stack size which is per default 8192 to 16384 (ersae and recompile the .pio build folder)
+//
+// Change Esp32 Stack size which is per default 8192 to 16384 (then erase and recompile the .pio build folder)
 // https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994
-// user/platformio/packages/framework-arduinoespressif32/tools/sdk/include/config/sdkconfig.h
+// Patch: Replace the file C:\Users\thisUser\.platformio\packages\framework-arduinoespressif32\cores\esp32\main.cpp
+// with the file 'main.cpp' from folder 'patches' of this repository, then use code to configure the stack size (see code below) 
 
 // Set WiFi and Azure credentials in file include/config_secret.h  (take config_secret_template.h as template)
 // Settings like sendinterval, timezone, daylightsavingstime settings, transport protocol, 
@@ -76,7 +77,14 @@
 
 #include "Rs_TimeNameHelper.h"
 
-
+// Default stack size of 8192 byte is not enough for this application.
+// --> configure stack size dynamically from code to 16384
+// https://community.platformio.org/t/esp32-stack-configuration-reloaded/20994/4
+// Patch: Replace C:\Users\thisUser\.platformio\packages\framework-arduinoespressif32\cores\esp32\main.cpp
+// with the file 'main.cpp' from folder 'patches' of this repository, then use the following code to configure stack size
+#if !(USING_DEFAULT_ARDUINO_LOOP_STACK_SIZE)
+  uint16_t USER_CONFIG_ARDUINO_LOOP_STACK_SIZE = 16384;
+#endif
 
 // Allocate memory space in memory segment .dram0.bss, ptr to this memory space is later
 // passed to TableClient (is used there as the place for some buffers to preserve stack )
